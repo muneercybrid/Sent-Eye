@@ -3,7 +3,7 @@
 Sent-Eye: OSINT tool for image intelligence gathering.
 
 Usage:
-    python sent_eye.py <path-to-image> [--output report.json] [--pretty]
+    python sent_eye.py <path-to-image> [--output report.json] [--html report.html] [--pretty]
 """
 import argparse
 import asyncio
@@ -28,6 +28,7 @@ def main() -> int:
     )
     parser.add_argument("image", help="Path to the image file to analyze.")
     parser.add_argument("-o", "--output", help="Write the JSON report to this file.")
+    parser.add_argument("--html", help="Write an HTML report to this file.")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON.")
     parser.add_argument("--no-banner", action="store_true", help="Suppress banner.")
     parser.add_argument(
@@ -56,14 +57,20 @@ def main() -> int:
         print(f"Unexpected error: {exc}", file=sys.stderr)
         return 2
 
-    output = json.dumps(report, indent=2 if args.pretty else None, default=str)
-
     if args.output:
+        output = json.dumps(report, indent=2 if args.pretty else None, default=str)
         with open(args.output, "w", encoding="utf-8") as fh:
             fh.write(output)
-        print(f"Report written to {args.output}", file=sys.stderr)
-    else:
-        print(output)
+        print(f"JSON report written to {args.output}", file=sys.stderr)
+    elif not args.html:
+        print(json.dumps(report, indent=2 if args.pretty else None, default=str))
+
+    if args.html:
+        from backend.exporters.html_report import HTMLReporter
+        html_content = HTMLReporter(report).render()
+        with open(args.html, "w", encoding="utf-8") as fh:
+            fh.write(html_content)
+        print(f"HTML report written to {args.html}", file=sys.stderr)
 
     return 0
 
