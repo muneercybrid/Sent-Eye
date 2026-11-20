@@ -1,7 +1,7 @@
 import asyncio
 import os
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import httpx
 
@@ -13,57 +13,154 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
 
-# (name, category, url_template, not_found_markers)
-# not_found_markers: substrings in body that prove the user is NOT registered.
-#   Empty list = rely on HTTP status code (404 = not claimed, 200 = claimed).
-SITES: List[Tuple[str, str, str, List[str]]] = [
-    # Code / developer
-    ("GitHub", "code", "https://github.com/{u}", []),
-    ("GitLab", "code", "https://gitlab.com/{u}", []),
-    ("BitBucket", "code", "https://bitbucket.org/{u}", []),
-    ("PyPI", "code", "https://pypi.org/user/{u}/", []),
-    ("Replit", "code", "https://replit.com/@{u}", []),
-    ("LeetCode", "code", "https://leetcode.com/{u}/", ["not found", "does not exist"]),
+# Each site is a dict:
+#   name        - display name
+#   category    - group for the report
+#   profile     - user-facing profile URL (what we show in the report)
+#   check       - URL we actually fetch (may be a JSON API)
+#   kind        - "api" | "html"
+#   not_found   - substrings in the response body that prove "not registered"
+#   confidence  - "high" (reliable: API or real 404) | "low" (SPA, 200 for any handle)
+SITES: List[Dict[str, Any]] = [
+    # --- High confidence: JSON APIs ---
+    {"name": "GitHub", "category": "code",
+     "profile": "https://github.com/{u}",
+     "check": "https://api.github.com/users/{u}",
+     "kind": "api", "not_found": ["Not Found"], "confidence": "high"},
 
-    # Social / streaming
-    ("Reddit", "social", "https://www.reddit.com/user/{u}/about.json", []),
-    ("Twitch", "social", "https://www.twitch.tv/{u}", []),
-    ("YouTube", "social", "https://www.youtube.com/@{u}", []),
-    ("SoundCloud", "social", "https://soundcloud.com/{u}", []),
-    ("Spotify", "social", "https://open.spotify.com/user/{u}", []),
-    ("Vimeo", "social", "https://vimeo.com/{u}", []),
-    ("Imgur", "social", "https://imgur.com/user/{u}", []),
+    {"name": "GitLab", "category": "code",
+     "profile": "https://gitlab.com/{u}",
+     "check": "https://gitlab.com/api/v4/users?username={u}",
+     "kind": "api", "not_found": ["[]"], "confidence": "high"},
 
-    # Writing
-    ("Dev.to", "writing", "https://dev.to/{u}", []),
-    ("HackerNews", "tech", "https://news.ycombinator.com/user?id={u}", ["No such user"]),
+    {"name": "Reddit", "category": "social",
+     "profile": "https://www.reddit.com/user/{u}/",
+     "check": "https://www.reddit.com/user/{u}/about.json",
+     "kind": "api", "not_found": [], "confidence": "high"},
 
-    # Tech / profiles
-    ("Keybase", "tech", "https://keybase.io/{u}", []),
-    ("Kaggle", "tech", "https://www.kaggle.com/{u}", []),
-    ("AboutMe", "profile", "https://about.me/{u}", []),
+    {"name": "HackerNews", "category": "tech",
+     "profile": "https://news.ycombinator.com/user?id={u}",
+     "check": "https://hacker-news.firebaseio.com/v0/user/{u}.json",
+     "kind": "api", "not_found": ["null"], "confidence": "high"},
 
-    # Security / bug bounty
-    ("HackerOne", "security", "https://hackerone.com/{u}", []),
-    ("Bugcrowd", "security", "https://bugcrowd.com/{u}", []),
+    {"name": "Keybase", "category": "tech",
+     "profile": "https://keybase.io/{u}",
+     "check": "https://keybase.io/_/api/1.0/user/lookup.json?username={u}",
+     "kind": "api", "not_found": ['"them":[]'], "confidence": "high"},
 
-    # Creative
-    ("Behance", "creative", "https://www.behance.net/{u}", []),
-    ("Dribbble", "creative", "https://dribbble.com/{u}", []),
-    ("DeviantArt", "creative", "https://www.deviantart.com/{u}", []),
-    ("Flickr", "creative", "https://www.flickr.com/people/{u}/", []),
-    ("Patreon", "creative", "https://www.patreon.com/{u}", ["page not found"]),
+    # --- High confidence: HTML with real 404 or clear not-found markers ---
+    {"name": "PyPI", "category": "code",
+     "profile": "https://pypi.org/user/{u}/",
+     "check": "https://pypi.org/user/{u}/",
+     "kind": "html", "not_found": [], "confidence": "high"},
+
+    {"name": "Dev.to", "category": "writing",
+     "profile": "https://dev.to/{u}",
+     "check": "https://dev.to/{u}",
+     "kind": "html", "not_found": ["page not found", "does not exist"], "confidence": "high"},
+
+    {"name": "BitBucket", "category": "code",
+     "profile": "https://bitbucket.org/{u}",
+     "check": "https://bitbucket.org/{u}",
+     "kind": "html", "not_found": ["page not found"], "confidence": "high"},
+
+    {"name": "Vimeo", "category": "social",
+     "profile": "https://vimeo.com/{u}",
+     "check": "https://vimeo.com/{u}",
+     "kind": "html", "not_found": ["page not found", "we couldn't find"], "confidence": "high"},
+
+    {"name": "Dribbble", "category": "creative",
+     "profile": "https://dribbble.com/{u}",
+     "check": "https://dribbble.com/{u}",
+     "kind": "html", "not_found": ["page not found", "we couldn't find"], "confidence": "high"},
+
+    {"name": "Bugcrowd", "category": "security",
+     "profile": "https://bugcrowd.com/{u}",
+     "check": "https://bugcrowd.com/{u}",
+     "kind": "html", "not_found": ["page not found"], "confidence": "high"},
+
+    {"name": "LeetCode", "category": "code",
+     "profile": "https://leetcode.com/{u}/",
+     "check": "https://leetcode.com/{u}/",
+     "kind": "html", "not_found": ["not found", "does not exist"], "confidence": "high"},
+
+    {"name": "Imgur", "category": "social",
+     "profile": "https://imgur.com/user/{u}",
+     "check": "https://imgur.com/user/{u}",
+     "kind": "html", "not_found": ["page not found"], "confidence": "high"},
+
+    {"name": "HackerOne", "category": "security",
+     "profile": "https://hackerone.com/{u}",
+     "check": "https://hackerone.com/{u}",
+     "kind": "html", "not_found": ["page not found"], "confidence": "high"},
+
+    {"name": "Behance", "category": "creative",
+     "profile": "https://www.behance.net/{u}",
+     "check": "https://www.behance.net/{u}",
+     "kind": "html", "not_found": ["page not found", "not found"], "confidence": "high"},
+
+    {"name": "DeviantArt", "category": "creative",
+     "profile": "https://www.deviantart.com/{u}",
+     "check": "https://www.deviantart.com/{u}",
+     "kind": "html", "not_found": ["page not found", "not found"], "confidence": "high"},
+
+    {"name": "Flickr", "category": "creative",
+     "profile": "https://www.flickr.com/people/{u}/",
+     "check": "https://www.flickr.com/people/{u}/",
+     "kind": "html", "not_found": ["page not found", "not found"], "confidence": "high"},
+
+    {"name": "Patreon", "category": "creative",
+     "profile": "https://www.patreon.com/{u}",
+     "check": "https://www.patreon.com/{u}",
+     "kind": "html", "not_found": ["page not found"], "confidence": "high"},
+
+    # --- Low confidence: SPA sites (200 for any handle, unreliable) ---
+    {"name": "YouTube", "category": "social",
+     "profile": "https://www.youtube.com/@{u}",
+     "check": "https://www.youtube.com/@{u}",
+     "kind": "html", "not_found": [], "confidence": "low"},
+
+    {"name": "Twitch", "category": "social",
+     "profile": "https://www.twitch.tv/{u}",
+     "check": "https://www.twitch.tv/{u}",
+     "kind": "html", "not_found": [], "confidence": "low"},
+
+    {"name": "SoundCloud", "category": "social",
+     "profile": "https://soundcloud.com/{u}",
+     "check": "https://soundcloud.com/{u}",
+     "kind": "html", "not_found": [], "confidence": "low"},
+
+    {"name": "Spotify", "category": "social",
+     "profile": "https://open.spotify.com/user/{u}",
+     "check": "https://open.spotify.com/user/{u}",
+     "kind": "html", "not_found": [], "confidence": "low"},
+
+    {"name": "Replit", "category": "code",
+     "profile": "https://replit.com/@{u}",
+     "check": "https://replit.com/@{u}",
+     "kind": "html", "not_found": [], "confidence": "low"},
+
+    {"name": "Kaggle", "category": "tech",
+     "profile": "https://www.kaggle.com/{u}",
+     "check": "https://www.kaggle.com/{u}",
+     "kind": "html", "not_found": [], "confidence": "low"},
+
+    {"name": "AboutMe", "category": "profile",
+     "profile": "https://about.me/{u}",
+     "check": "https://about.me/{u}",
+     "kind": "html", "not_found": [], "confidence": "low"},
 ]
+
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 
-def _load_sites() -> List[Tuple[str, str, str, List[str]]]:
+def _load_sites() -> List[Dict[str, Any]]:
     raw = os.environ.get("SENT_EYE_USERNAME_SITES", "").strip()
     if not raw:
         return SITES
     wanted = {s.strip().lower() for s in raw.split(",") if s.strip()}
-    filtered = [s for s in SITES if s[0].lower() in wanted]
+    filtered = [s for s in SITES if s["name"].lower() in wanted]
     return filtered or SITES
 
 
@@ -97,7 +194,7 @@ class UsernameModule(BaseModule):
         sem = asyncio.Semaphore(self.concurrency)
         headers = {
             "User-Agent": USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+            "Accept": "application/json, text/html;q=0.9, */*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
         }
 
@@ -109,22 +206,29 @@ class UsernameModule(BaseModule):
             tasks = [self._check(client, sem, site, username) for site in self.sites]
             results = await asyncio.gather(*tasks)
 
-        claimed = [r for r in results if r["status"] == "claimed"]
+        claimed_high = [r for r in results if r["status"] == "claimed" and r["confidence"] == "high"]
+        claimed_low = [r for r in results if r["status"] == "claimed" and r["confidence"] == "low"]
         available = [r for r in results if r["status"] == "available"]
         ambiguous = [r for r in results if r["status"] in ("ambiguous", "error")]
+        blocked = [r for r in ambiguous if r.get("http_code") in (403, 429)]
 
-        if claimed:
+        if claimed_high or claimed_low:
             status = ModuleStatus.SUCCESS
         elif available:
             status = ModuleStatus.PARTIAL
         else:
             status = ModuleStatus.FAILED
 
-        warnings = [
-            f"{r['name']}: {r['status']}"
-            + (f" ({r.get('error')})" if r.get("error") else f" (HTTP {r.get('http_code')})")
-            for r in ambiguous
-        ]
+        warnings: List[str] = []
+        if blocked:
+            warnings.append(
+                f"{len(blocked)} site(s) returned 403/429 — likely cloud IP blocking "
+                f"(AWS/GCP ranges are blocked by Cloudflare/Akamai). "
+                f"Run locally for full accuracy."
+            )
+        for r in ambiguous:
+            detail = r.get("error") or f"HTTP {r.get('http_code')}"
+            warnings.append(f"{r['name']}: {detail}")
 
         return ModuleResult(
             status=status,
@@ -132,29 +236,27 @@ class UsernameModule(BaseModule):
             metadata={
                 "username": username,
                 "sites_checked": len(self.sites),
-                "claimed": len(claimed),
+                "claimed_high": len(claimed_high),
+                "claimed_low": len(claimed_low),
                 "available": len(available),
                 "ambiguous": len(ambiguous),
+                "blocked": len(blocked),
             },
             warnings=warnings,
         )
 
-    async def _check(
-        self,
-        client: httpx.AsyncClient,
-        sem: asyncio.Semaphore,
-        site: Tuple[str, str, str, List[str]],
-        username: str,
-    ) -> Dict[str, Any]:
-        name, category, url_tpl, not_found_markers = site
-        url = url_tpl.format(u=username)
-        result: Dict[str, Any] = {
-            "name": name,
-            "category": category,
-            "url": url,
+    async def _check(self, client, sem, site, username):
+        url = site["check"].format(u=username)
+        profile_url = site["profile"].format(u=username)
+        result = {
+            "name": site["name"],
+            "category": site["category"],
+            "url": profile_url,
             "status": "unknown",
             "http_code": None,
             "error": None,
+            "confidence": site["confidence"],
+            "kind": site["kind"],
         }
 
         async with sem:
@@ -177,10 +279,9 @@ class UsernameModule(BaseModule):
 
         if resp.status_code == 200:
             body_lower = resp.text.lower()
-            if any(marker.lower() in body_lower for marker in not_found_markers):
+            if any(marker.lower() in body_lower for marker in site["not_found"]):
                 result["status"] = "available"
                 return result
-            # Login redirect? Not reliable.
             final_path = str(resp.url).lower()
             if "/login" in final_path or "/signin" in final_path or "/sign-in" in final_path:
                 result["status"] = "ambiguous"
@@ -189,7 +290,7 @@ class UsernameModule(BaseModule):
             result["status"] = "claimed"
             return result
 
-        if resp.status_code in (401, 403, 429):
+        if resp.status_code in (401, 403, 429, 503):
             result["status"] = "ambiguous"
             result["error"] = f"blocked (HTTP {resp.status_code})"
             return result

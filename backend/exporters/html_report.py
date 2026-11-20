@@ -364,15 +364,19 @@ class HTMLReporter:
         if not findings:
             return '<p style="color:#94a3b8;">No sites were checked.</p>'
 
-        claimed = [f for f in findings if f.get("status") == "claimed"]
+        claimed_high = [f for f in findings if f.get("status") == "claimed" and f.get("confidence") == "high"]
+        claimed_low = [f for f in findings if f.get("status") == "claimed" and f.get("confidence") == "low"]
         available = [f for f in findings if f.get("status") == "available"]
         ambiguous = [f for f in findings if f.get("status") in ("ambiguous", "error")]
+        blocked = [f for f in ambiguous if f.get("http_code") in (403, 429)]
 
         parts = []
         parts.append(
             '<div class="stats">'
-            f'<div class="stat"><div class="stat-value">{len(claimed)}</div>'
-            f'<div class="stat-label">Claimed</div></div>'
+            f'<div class="stat"><div class="stat-value">{len(claimed_high)}</div>'
+            f'<div class="stat-label">Confirmed</div></div>'
+            f'<div class="stat"><div class="stat-value">{len(claimed_low)}</div>'
+            f'<div class="stat-label">Unverified</div></div>'
             f'<div class="stat"><div class="stat-value">{len(available)}</div>'
             f'<div class="stat-label">Available</div></div>'
             f'<div class="stat"><div class="stat-value">{len(ambiguous)}</div>'
@@ -380,10 +384,19 @@ class HTMLReporter:
             '</div>'
         )
 
-        if claimed:
-            parts.append('<h4 style="color:#38bdf8;margin:20px 0 8px 0;">Claimed Profiles</h4>')
-            parts.append('<table><tr><th>Site</th><th>Category</th><th>Profile URL</th></tr>')
-            for f in sorted(claimed, key=lambda x: x.get("name", "")):
+        if blocked:
+            parts.append(
+                f'<div class="card" style="border-left:4px solid #eab308;">'
+                f'<p style="margin:0;color:#facc15;">'
+                f'<strong>{len(blocked)} site(s) returned 403/429</strong> — likely cloud-IP blocking '
+                f'(AWS/GCP ranges are blocked by Cloudflare/Akamai). '
+                f'Run Sent Eye locally for full accuracy.</p></div>'
+            )
+
+        if claimed_high:
+            parts.append('<h4 style="color:#22c55e;margin:20px 0 8px 0;">Confirmed Profiles (API / reliable)</h4>')
+            parts.append('<table><tr><th>Site</th><th>Category</th><th>Profile</th></tr>')
+            for f in sorted(claimed_high, key=lambda x: x.get("name", "")):
                 parts.append(
                     f'<tr><td><strong>{_esc(f.get("name", ""))}</strong></td>'
                     f'<td>{_esc(f.get("category", ""))}</td>'
@@ -391,7 +404,24 @@ class HTMLReporter:
                     f'{_esc(f.get("url", ""))}</a></td></tr>'
                 )
             parts.append('</table>')
-        else:
+
+        if claimed_low:
+            parts.append('<h4 style="color:#eab308;margin:20px 0 8px 0;">Unverified Profiles (verify manually)</h4>')
+            parts.append(
+                '<p style="color:#94a3b8;font-size:0.9em;margin:0 0 8px 0;">'
+                'These sites return HTTP 200 for any handle — open each link to confirm.</p>'
+            )
+            parts.append('<table><tr><th>Site</th><th>Category</th><th>Profile</th></tr>')
+            for f in sorted(claimed_low, key=lambda x: x.get("name", "")):
+                parts.append(
+                    f'<tr><td><strong>{_esc(f.get("name", ""))}</strong></td>'
+                    f'<td>{_esc(f.get("category", ""))}</td>'
+                    f'<td><a href="{_esc(f.get("url", "#"))}" target="_blank">'
+                    f'{_esc(f.get("url", ""))}</a></td></tr>'
+                )
+            parts.append('</table>')
+
+        if not claimed_high and not claimed_low:
             parts.append(
                 '<p style="color:#94a3b8;margin-top:16px;">'
                 'No profiles found — username appears unclaimed across all checked sites.'
