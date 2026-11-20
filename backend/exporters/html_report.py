@@ -1,3 +1,4 @@
+import base64
 import html
 import json
 from datetime import datetime
@@ -49,6 +50,32 @@ def _status_badge(status: str) -> str:
         f'border-radius:12px;font-size:0.75em;font-weight:700;letter-spacing:0.03em;">'
         f"{_esc(status.upper())}</span>"
     )
+
+
+
+def _load_image_as_data_uri(path):
+    """Load an image as a base64 data URI, or None on failure."""
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+    except Exception:
+        return None
+    ext = Path(path).suffix.lower()
+    mime = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".webp": "image/webp", ".bmp": "image/bmp",
+    }.get(ext, "image/jpeg")
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def _get_image_dimensions(path):
+    """Return (width, height) for an image, or None on failure."""
+    try:
+        from PIL import Image
+        with Image.open(path) as im:
+            return im.size
+    except Exception:
+        return None
 
 
 class HTMLReporter:
@@ -122,6 +149,8 @@ class HTMLReporter:
             parts.append(self._render_geolocation(findings))
         elif name == "reverse_image_search":
             parts.append(self._render_reverse_search(findings))
+        elif name == "face_analysis":
+            parts.append(self._render_face_analysis(findings))
         else:
             parts.append(self._render_generic(findings))
 
@@ -192,6 +221,70 @@ class HTMLReporter:
                 f'<small>{_esc(source)}</small></div>'
             )
         return f'<div class="result-grid">{"".join(cards)}</div>'
+
+    def _render_face_analysis(self, findings):
+        if not findings:
+            return "<p>No faces detected in the image.</p>"
+
+        target = self.report.get("target", "")
+        data_uri = _load_image_as_data_uri(target) if target else None
+        dims = _get_image_dimensions(target) if target else None
+
+        parts = []
+
+        if data_uri and dims:
+            width, height = dims
+            shapes = []
+            for f in findings:
+                loc = f.get("location", {})
+                top = loc.get("top", 0)
+                left = loc.get("left", 0)
+                right = loc.get("right", 0)
+                bottom = loc.get("bottom", 0)
+                color = "#22c55e" if f.get("has_match") else "#38bdf8"
+                shapes.append(
+                    f'<rect x="{left}" y="{top}" '
+                    f'width="{right - left}" height="{bottom - top}" '
+                    f'fill="none" stroke="{color}" stroke-width="4"/>'
+                )
+                shapes.append(
+                    f'<text x="{left}" y="{max(top - 8, 20)}" '
+                    f'fill="{color}" font-size="20" font-weight="bold">'
+                    f'Face {f.get("face_index")}</text>'
+                )
+            parts.append(
+                '<div class="card" style="text-align:center;">'
+                f'<svg viewBox="0 0 {width} {height}" '
+                'style="max-width:100%;height:auto;max-height:600px;">'
+                f'<image href="{data_uri}" width="{width}" height="{height}"/>'
+                f'{"".join(shapes)}</svg>'
+                '</div>'
+            )
+
+        for f in findings:
+            parts.append(f'<div class="card"><h3>Face {f.get("face_index")}</h3>')
+            matches = f.get("matches", [])
+            if not matches:
+                parts.append('<p style="color:#94a3b8;">No matches (no reference database configured).</p>')
+            else:
+                parts.append('<table><tr><th>Reference</th><th>Distance</th><th>Result</th></tr>')
+                for m in matches:
+                    dist = m["distance"]
+                    pct = max(0, min(100, int((1 - dist) * 100)))
+                    is_match = m["is_match"]
+                    color = "#22c55e" if is_match else "#64748b"
+                    label = "MATCH" if is_match else "no match"
+                    parts.append(
+                        f'<tr><td>{_esc(m["file"])}</td>'
+                        '<td><div style="background:#0f172a;border-radius:4px;overflow:hidden;margin-bottom:4px;">'
+                        f'<div style="width:{pct}%;background:{color};height:12px;"></div></div>'
+                        f'<span style="font-size:0.8em;color:#94a3b8;">{dist:.4f}</span></td>'
+                        f'<td><span style="color:{color};font-weight:700;">{label}</span></td></tr>'
+                    )
+                parts.append('</table>')
+            parts.append('</div>')
+
+        return "\n".join(parts)
 
     def _render_generic(self, findings: List[Dict]) -> str:
         if not findings:
