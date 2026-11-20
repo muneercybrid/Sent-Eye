@@ -9,6 +9,7 @@ from backend.modules.geolocation import GeolocationModule
 from backend.modules.face_analysis import FaceAnalysisModule
 from backend.modules.username import UsernameModule
 from backend.modules.email import EmailModule
+from backend.modules.vin import VINModule
 
 MODULE_REGISTRY: List[Type[BaseModule]] = [
     MetadataModule,
@@ -17,6 +18,7 @@ MODULE_REGISTRY: List[Type[BaseModule]] = [
     FaceAnalysisModule,
     UsernameModule,
     EmailModule,
+    VINModule,
 ]
 
 

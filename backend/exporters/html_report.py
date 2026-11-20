@@ -179,6 +179,8 @@ class HTMLReporter:
             parts.append(self._render_username_enumeration(findings, status=status))
         elif name == "email_intel":
             parts.append(self._render_email_intel(findings, status=status))
+        elif name == "vin_decode":
+            parts.append(self._render_vin_decode(findings, status=status))
         else:
             parts.append(self._render_generic(findings))
 
@@ -578,6 +580,97 @@ class HTMLReporter:
                 f'<p style="color:#94a3b8;margin-top:16px;">'
                 f'{_esc(hibp.get("detail", ""))}</p>'
             )
+
+        return "\n".join(parts)
+
+    def _render_vin_decode(self, findings, status=None):
+        if not findings:
+            return '<p style="color:#94a3b8;">VIN was not decoded.</p>'
+
+        decode = next((f for f in findings if f.get("category") == "decode"), None)
+        recalls = next((f for f in findings if f.get("category") == "recalls"), None)
+
+        parts = []
+
+        if decode and decode.get("status") == "ok":
+            decoded = decode.get("decoded", {})
+            parts.append(
+                '<div class="card" style="border-left:4px solid #38bdf8;">'
+                '<h3 style="margin:0 0 12px 0;color:#38bdf8;">Vehicle Identity</h3>'
+                '<table class="meta-table">'
+            )
+            ordered_keys = [
+                "Make", "Model", "ModelYear", "Series", "Trim", "BodyClass",
+                "VehicleType", "Doors", "DriveType", "EngineCylinders",
+                "DisplacementL", "EngineHP", "FuelTypePrimary",
+                "TransmissionStyle", "TransmissionSpeeds", "GVWR",
+                "SeatBeltsAll", "BrakeSystemType",
+                "PlantCity", "PlantState", "PlantCountry", "PlantCompanyName",
+                "Manufacturer",
+            ]
+            for key in ordered_keys:
+                if key in decoded:
+                    parts.append(
+                        f'<tr><td>{_esc(key)}</td><td>{_esc(decoded[key])}</td></tr>'
+                    )
+            picture = decoded.get("VehiclePicture")
+            if picture:
+                parts.append('</table>')
+                parts.append(
+                    f'<p style="margin-top:12px;"><img src="{_esc(picture)}" '
+                    f'alt="Vehicle" style="max-width:320px;border-radius:8px;background:#0f172a;"></p>'
+                )
+            else:
+                parts.append('</table>')
+            parts.append('</div>')
+        elif decode:
+            parts.append(
+                f'<div class="card" style="border-left:4px solid #eab308;">'
+                f'<p style="margin:0;color:#facc15;">'
+                f'{_esc(decode.get("detail", "Decode incomplete."))}</p></div>'
+            )
+
+        if decode:
+            all_fields = decode.get("all_fields", {})
+            if all_fields:
+                parts.append(
+                    f'<details class="meta-group"><summary><strong>All vPIC fields '
+                    f'<span style="color:#64748b;">({len(all_fields)})</span></summary>'
+                    '<table class="meta-table">'
+                )
+                for k in sorted(all_fields.keys()):
+                    v = all_fields[k]
+                    if isinstance(v, str) and len(v) > 200:
+                        v = v[:200] + "..."
+                    parts.append(
+                        f'<tr><td>{_esc(k)}</td><td>{_esc(v)}</td></tr>'
+                    )
+                parts.append('</table></details>')
+
+        if recalls:
+            count = len(recalls.get("recalls") or [])
+            if count == 0:
+                parts.append(
+                    '<h4 style="color:#22c55e;margin:20px 0 8px 0;">'
+                    'Recalls — No Open Recalls</h4>'
+                    '<p style="color:#94a3b8;">'
+                    'NHTSA has no open recalls on file for this vehicle.</p>'
+                )
+            else:
+                parts.append(
+                    f'<h4 style="color:#fca5a5;margin:20px 0 8px 0;">'
+                    f'Recalls — {count} on File</h4>'
+                )
+                parts.append(
+                    '<table><tr><th>Campaign</th><th>Component</th><th>Summary</th></tr>'
+                )
+                for r in recalls["recalls"]:
+                    parts.append(
+                        f'<tr><td><code>{_esc(r.get("campaign", ""))}</code></td>'
+                        f'<td><strong>{_esc(r.get("component", ""))}</strong></td>'
+                        f'<td style="font-size:0.9em;">{_esc(r.get("summary", ""))}</td></tr>'
+                    )
+                parts.append('</table>')
 
         return "\n".join(parts)
 
