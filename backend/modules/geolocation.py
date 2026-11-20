@@ -11,7 +11,7 @@ from .base import BaseModule, ModuleResult, ModuleStatus
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
 # Nominatim's usage policy requires a descriptive User-Agent.
 # For personal/dev use this is fine; for public deployment, add contact info.
-USER_AGENT = "Sent-Eye/0.1 (https://github.com/muneercybrid/Sent-Eye)"
+USER_AGENT = "Sent-Eye/0.1 (https://github.com/muneercybrid/sent-eye)"
 
 
 def _extract_coord(raw_value: Any, ref: Optional[str]) -> Optional[float]:
