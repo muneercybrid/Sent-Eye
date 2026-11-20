@@ -2,7 +2,7 @@ import asyncio
 import os
 from typing import Dict, List, Type
 
-from backend.modules.base import BaseModule
+from backend.modules.base import BaseModule, TargetType
 from backend.modules.metadata import MetadataModule
 from backend.modules.reverse_search import ReverseSearchModule
 from backend.modules.geolocation import GeolocationModule
@@ -15,20 +15,30 @@ MODULE_REGISTRY: List[Type[BaseModule]] = [
     FaceAnalysisModule,
 ]
 
-class SentEyeRunner:
-    """Orchestrates all registered modules against a single image."""
 
-    def __init__(self, image_path: str):
-        self.image_path = image_path
-        self.modules: List[BaseModule] = [cls() for cls in MODULE_REGISTRY]
+class SentEyeRunner:
+    """Orchestrates all modules that support a given target type."""
+
+    def __init__(self, target_path: str, target_type: TargetType = TargetType.IMAGE):
+        self.target_path = target_path
+        self.target_type = target_type
+        self.modules: List[BaseModule] = [
+            cls() for cls in MODULE_REGISTRY
+            if target_type in getattr(cls, "target_types", {TargetType.IMAGE})
+        ]
 
     async def run_all(self) -> Dict:
-        if not os.path.exists(self.image_path):
-            raise FileNotFoundError(f"Image not found: {self.image_path}")
+        if self.target_type == TargetType.IMAGE and not os.path.exists(self.target_path):
+            raise FileNotFoundError(f"Image not found: {self.target_path}")
+
+        if not self.modules:
+            raise ValueError(
+                f"No modules registered for target type '{self.target_type.value}'."
+            )
 
         results = {}
         for module in self.modules:
-            result = await module.run(self.image_path)
+            result = await module.run(self.target_path)
             results[module.name] = {
                 "description": module.description,
                 "status": result.status.value,
@@ -40,7 +50,8 @@ class SentEyeRunner:
 
         return {
             "tool": "Sent Eye",
-            "target": os.path.abspath(self.image_path),
+            "target": self.target_path,
+            "target_type": self.target_type.value,
             "modules_run": len(self.modules),
             "results": results,
         }

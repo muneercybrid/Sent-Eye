@@ -123,6 +123,7 @@ class BatchHTMLReporter(HTMLReporter):
 <h1>Sent Eye Batch Report</h1>
 <div class="summary-bar">
   <p style="margin:0 0 6px 0;">Directory: <code>{_esc(directory)}</code></p>
+  <p style="margin:0 0 6px 0;">Target type: <code>{_esc(self.report.get('target_type', 'image'))}</code> (batch)</p>
   <p style="margin:0 0 6px 0;">Generated: {_esc(timestamp)}</p>
   <p style="margin:0;">Images found: {total} | Analyzed: {analyzed} | Errors: {len(batch_errors)}</p>
 </div>

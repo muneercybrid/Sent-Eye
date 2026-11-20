@@ -13,6 +13,7 @@ import os
 import sys
 
 from backend.core.runner import SentEyeRunner
+from backend.modules.base import TargetType
 
 BANNER = r"""
    _____            __     ______
@@ -23,6 +24,21 @@ BANNER = r"""
                              /____/
        OSINT Image Intelligence Tool
 """
+
+def infer_target_type(arg: str) -> TargetType:
+    """Guess target type from CLI argument. Defaults to IMAGE."""
+    if arg.startswith("@") and len(arg) > 1 and not os.path.exists(arg):
+        return TargetType.USERNAME
+    if "@" in arg and not os.path.exists(arg):
+        local, _, domain = arg.rpartition("@")
+        if local and "." in domain:
+            return TargetType.EMAIL
+    if arg.startswith("+") and len(arg) > 4:
+        digits = arg[1:].replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+        if digits.isdigit():
+            return TargetType.PHONE
+    return TargetType.IMAGE
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -53,6 +69,12 @@ def main() -> int:
         metavar="LIST",
         help="Comma-separated reverse-image engines: yandex, tineye, google_lens, all. "
              "Default: yandex.",
+    )
+    parser.add_argument(
+        "--type",
+        metavar="TYPE",
+        help="Force target type. One of: image, username, email, phone, ip, "
+             "domain, vin, mac, plate, coords. Default: auto-detect.",
     )
     parser.add_argument(
         "-r", "--recursive",
@@ -106,7 +128,19 @@ def main() -> int:
             return 4
         os.environ["SENT_EYE_FACE_DB"] = args.face_db
 
-    is_batch = os.path.isdir(args.image)
+    # Resolve target type (explicit --type, or inferred from argument shape)
+    if args.type:
+        try:
+            target_type = TargetType(args.type.lower())
+        except ValueError:
+            available = ", ".join(t.value for t in TargetType)
+            print(f"Error: unknown target type '{args.type}'", file=sys.stderr)
+            print(f"Available: {available}", file=sys.stderr)
+            return 6
+    else:
+        target_type = infer_target_type(args.image)
+
+    is_batch = os.path.isdir(args.image) and target_type == TargetType.IMAGE
     try:
         if is_batch:
             from backend.core.batch import SentEyeBatchRunner
@@ -115,7 +149,7 @@ def main() -> int:
             batch_runner = SentEyeBatchRunner(args.image, recursive=args.recursive)
             report = asyncio.run(batch_runner.run_all(on_progress=_progress))
         else:
-            runner = SentEyeRunner(args.image)
+            runner = SentEyeRunner(args.image, target_type=target_type)
             report = asyncio.run(runner.run_all())
     except FileNotFoundError as exc:
         print(f"Error: {exc}", file=sys.stderr)

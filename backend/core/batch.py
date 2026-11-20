@@ -46,6 +46,7 @@ class SentEyeBatchRunner:
         return {
             "tool": "Sent Eye",
             "mode": "batch",
+            "target_type": "image",
             "directory": os.path.abspath(self.directory),
             "recursive": self.recursive,
             "images_found": total,

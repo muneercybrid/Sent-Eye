@@ -113,6 +113,7 @@ class HTMLReporter:
 <h1>Sent Eye Intelligence Report</h1>
 <div class="summary-bar">
   <p style="margin:0 0 6px 0;">Target: <code>{_esc(target)}</code></p>
+  <p style="margin:0 0 6px 0;">Type: <code>{_esc(self.report.get('target_type', 'image'))}</code></p>
   <p style="margin:0 0 6px 0;">Generated: {_esc(timestamp)}</p>
   <p style="margin:0;">Modules run: {_esc(self.report.get("modules_run"))}</p>
 </div>
@@ -146,11 +147,16 @@ class HTMLReporter:
         parts = [f"<{header}>{_esc(name)}</{header}>"]
         parts.append(f"<p style='color:#94a3b8;'>{_esc(data.get('description', ''))}</p>")
 
-        if errors:
+        # Only failed modules show a red error card. For partial/skipped/success,
+        # errors (if any) get demoted to warnings so nothing looks scarier than it is.
+        if status == "failed" and errors:
             parts.append('<div class="card" style="border-left:4px solid #ef4444;"><h3>Errors</h3>')
             for err in errors:
                 parts.append(f'<p class="error">* {_esc(err)}</p>')
             parts.append("</div>")
+        elif errors:
+            warnings = list(warnings) + list(errors)
+            errors = []
 
         if warnings:
             parts.append(

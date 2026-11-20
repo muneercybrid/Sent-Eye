@@ -1,7 +1,20 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
+
+class TargetType(str, Enum):
+    IMAGE = "image"
+    USERNAME = "username"
+    EMAIL = "email"
+    PHONE = "phone"
+    IP = "ip"
+    DOMAIN = "domain"
+    VIN = "vin"
+    MAC = "mac"
+    PLATE = "plate"
+    COORDS = "coords"
+
 
 class ModuleStatus(str, Enum):
     SUCCESS = "success"
@@ -25,6 +38,9 @@ class BaseModule(ABC):
     name: str = "base_module"
     description: str = "Base module contract."
     requires_key: bool = False
+    # Which target types this module handles. Defaults to image-only so
+    # existing modules need zero changes to keep working.
+    target_types: Set["TargetType"] = {TargetType.IMAGE}
 
     @abstractmethod
     async def run(self, image_path: str) -> ModuleResult:
