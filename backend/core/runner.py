@@ -8,6 +8,7 @@ from backend.modules.reverse_search import ReverseSearchModule
 from backend.modules.geolocation import GeolocationModule
 from backend.modules.face_analysis import FaceAnalysisModule
 from backend.modules.username import UsernameModule
+from backend.modules.email import EmailModule
 
 MODULE_REGISTRY: List[Type[BaseModule]] = [
     MetadataModule,
@@ -15,6 +16,7 @@ MODULE_REGISTRY: List[Type[BaseModule]] = [
     ReverseSearchModule,
     FaceAnalysisModule,
     UsernameModule,
+    EmailModule,
 ]
 
 

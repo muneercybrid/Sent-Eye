@@ -177,6 +177,8 @@ class HTMLReporter:
             parts.append(self._render_face_analysis(findings, target=target, status=status))
         elif name == "username_enumeration":
             parts.append(self._render_username_enumeration(findings, status=status))
+        elif name == "email_intel":
+            parts.append(self._render_email_intel(findings, status=status))
         else:
             parts.append(self._render_generic(findings))
 
@@ -456,6 +458,126 @@ class HTMLReporter:
                     f'<td>{_esc(detail)}</td></tr>'
                 )
             parts.append('</table></details>')
+
+        return "\n".join(parts)
+
+    def _render_email_intel(self, findings, status=None):
+        if not findings:
+            return '<p style="color:#94a3b8;">No checks were run.</p>'
+
+        by_cat: Dict[str, List[Dict[str, Any]]] = {}
+        for f in findings:
+            by_cat.setdefault(f.get("category", "other"), []).append(f)
+
+        parts = []
+
+        hibp = next((f for f in findings if f.get("check") == "hibp"), None)
+        if hibp:
+            if hibp.get("status") == "breached":
+                parts.append(
+                    '<div class="card" style="border-left:4px solid #ef4444;">'
+                    f'<h3 style="margin:0 0 8px 0;color:#fca5a5;">'
+                    f'{_esc(hibp.get("detail", ""))}</h3>'
+                    '<p style="color:#94a3b8;margin:0;">Review the breach list below.</p>'
+                    '</div>'
+                )
+            elif hibp.get("status") == "ok":
+                parts.append(
+                    '<div class="card" style="border-left:4px solid #22c55e;">'
+                    '<h3 style="margin:0;color:#86efac;">No known breaches</h3></div>'
+                )
+
+        if "validation" in by_cat:
+            parts.append('<h4 style="color:#38bdf8;margin:20px 0 8px 0;">Validation</h4>')
+            parts.append('<table><tr><th>Check</th><th>Status</th><th>Detail</th></tr>')
+            for f in by_cat["validation"]:
+                color = {
+                    "ok": "#86efac", "detected": "#fde047",
+                    "warning": "#fde047", "error": "#fca5a5",
+                }.get(f.get("status"), "#e2e8f0")
+                parts.append(
+                    f'<tr><td>{_esc(f.get("check", ""))}</td>'
+                    f'<td style="color:{color};font-weight:600;">{_esc(f.get("status", ""))}</td>'
+                    f'<td>{_esc(f.get("detail", ""))}</td></tr>'
+                )
+            parts.append('</table>')
+
+        if "domain" in by_cat:
+            parts.append('<h4 style="color:#38bdf8;margin:20px 0 8px 0;">Domain</h4>')
+            for f in by_cat["domain"]:
+                parts.append('<div class="card">')
+                parts.append(
+                    f'<p style="margin:0 0 8px 0;"><strong>{_esc(f.get("check", ""))}</strong> — '
+                    f'{_esc(f.get("detail", ""))}</p>'
+                )
+                records = f.get("records") or []
+                if records:
+                    parts.append('<table><tr><th>Priority</th><th>Host</th></tr>')
+                    for r in records:
+                        parts.append(
+                            f'<tr><td>{_esc(r.get("priority"))}</td>'
+                            f'<td><code>{_esc(r.get("host"))}</code></td></tr>'
+                        )
+                    parts.append('</table>')
+                parts.append('</div>')
+
+        if "profile" in by_cat:
+            parts.append('<h4 style="color:#38bdf8;margin:20px 0 8px 0;">Profile (Gravatar)</h4>')
+            for f in by_cat["profile"]:
+                if f.get("status") == "none":
+                    parts.append(
+                        '<p style="color:#94a3b8;">No Gravatar profile found.</p>'
+                    )
+                    continue
+                if f.get("status") == "error":
+                    parts.append(f'<p class="error">{_esc(f.get("detail", ""))}</p>')
+                    continue
+                parts.append('<div class="card">')
+                parts.append('<div style="display:flex;gap:16px;align-items:flex-start;">')
+                avatar_url = f.get("url")
+                if avatar_url:
+                    parts.append(
+                        f'<img src="{_esc(avatar_url)}" alt="Avatar" '
+                        f'style="width:96px;height:96px;border-radius:8px;background:#0f172a;flex-shrink:0;">'
+                    )
+                parts.append('<div style="flex:1;">')
+                if f.get("display_name"):
+                    parts.append(f'<p style="margin:0 0 4px 0;"><strong>Display name:</strong> {_esc(f["display_name"])}</p>')
+                if f.get("full_name"):
+                    parts.append(f'<p style="margin:0 0 4px 0;"><strong>Full name:</strong> {_esc(f["full_name"])}</p>')
+                if f.get("about"):
+                    parts.append(f'<p style="margin:0 0 4px 0;"><strong>About:</strong> {_esc(f["about"])}</p>')
+                urls = f.get("urls") or []
+                if urls:
+                    parts.append('<p style="margin:0 0 4px 0;"><strong>Linked URLs:</strong></p>')
+                    parts.append('<ul style="margin:0 0 8px 20px;">')
+                    for u in urls:
+                        parts.append(f'<li><a href="{_esc(u)}" target="_blank">{_esc(u)}</a></li>')
+                    parts.append('</ul>')
+                parts.append('</div></div></div>')
+
+        if "breaches" in by_cat:
+            for f in by_cat["breaches"]:
+                if f.get("status") != "breached":
+                    continue
+                breaches = f.get("breaches") or []
+                parts.append('<h4 style="color:#fca5a5;margin:20px 0 8px 0;">Breach History</h4>')
+                parts.append('<table><tr><th>Breach</th><th>Date</th><th>Accounts</th><th>Data leaked</th></tr>')
+                for b in breaches:
+                    data_classes = ", ".join(b.get("data_classes", []))[:120]
+                    parts.append(
+                        f'<tr><td><strong>{_esc(b.get("title") or b.get("name", ""))}</strong></td>'
+                        f'<td>{_esc(b.get("date", ""))}</td>'
+                        f'<td>{_esc(b.get("pwn_count", ""))}</td>'
+                        f'<td style="font-size:0.85em;">{_esc(data_classes)}</td></tr>'
+                    )
+                parts.append('</table>')
+
+        if hibp and hibp.get("status") == "skipped":
+            parts.append(
+                f'<p style="color:#94a3b8;margin-top:16px;">'
+                f'{_esc(hibp.get("detail", ""))}</p>'
+            )
 
         return "\n".join(parts)
 
