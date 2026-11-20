@@ -1,1 +1,1 @@
-# Sent-Eye core package
+# Sent Eye core package

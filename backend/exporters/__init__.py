@@ -1,1 +1,1 @@
-# Sent-Eye exporters package
+# Sent Eye exporters package

@@ -18,7 +18,7 @@ class ModuleResult:
 
 class BaseModule(ABC):
     """
-    The contract every Sent-Eye module must follow.
+    The contract every Sent Eye module must follow.
     Each module should implement the 'run' method.
     """
     name: str = "base_module"

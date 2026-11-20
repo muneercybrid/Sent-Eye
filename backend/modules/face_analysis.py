@@ -8,7 +8,7 @@ from backend.compat import install_pkg_resources_shim
 
 install_pkg_resources_shim()
 
-# face_recognition is imported lazily inside run() so the rest of Sent-Eye
+# face_recognition is imported lazily inside run() so the rest of Sent Eye
 # works even if it isn't installed yet.
 _SUPPORTED_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 

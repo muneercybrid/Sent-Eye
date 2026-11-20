@@ -38,7 +38,7 @@ class SentEyeRunner:
             }
 
         return {
-            "tool": "Sent-Eye",
+            "tool": "Sent Eye",
             "target": os.path.abspath(self.image_path),
             "modules_run": len(self.modules),
             "results": results,

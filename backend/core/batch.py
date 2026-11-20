@@ -1,4 +1,4 @@
-"""Batch orchestration for Sent-Eye."""
+"""Batch orchestration for Sent Eye."""
 import asyncio
 import os
 from pathlib import Path
@@ -22,7 +22,7 @@ def collect_images(directory: str, recursive: bool = False) -> List[str]:
 
 
 class SentEyeBatchRunner:
-    """Runs the full Sent-Eye pipeline against every image in a directory."""
+    """Runs the full Sent Eye pipeline against every image in a directory."""
 
     def __init__(self, directory: str, recursive: bool = False):
         self.directory = directory
@@ -44,7 +44,7 @@ class SentEyeBatchRunner:
                     {"image": image_path, "error": f"{type(exc).__name__}: {exc}"}
                 )
         return {
-            "tool": "Sent-Eye",
+            "tool": "Sent Eye",
             "mode": "batch",
             "directory": os.path.abspath(self.directory),
             "recursive": self.recursive,
