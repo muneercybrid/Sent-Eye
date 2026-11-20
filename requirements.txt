@@ -1,2 +1,3 @@
 # Core dependencies for Sent-Eye
 PicImageSearch>=3.10.0
+httpx>=0.28.1
