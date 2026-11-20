@@ -45,14 +45,18 @@ SITES: List[Dict[str, Any]] = [
 
     {"name": "Keybase", "category": "tech",
      "profile": "https://keybase.io/{u}",
-     "check": "https://keybase.io/_/api/1.0/user/lookup.json?username={u}",
-     "kind": "api", "not_found": ['"them":[]'], "confidence": "high"},
+     "check": "https://keybase.io/{u}",
+     "kind": "html",
+     "not_found": ["user not found", "couldn't find", "not found", "404"],
+     "confidence": "high"},
 
     # --- High confidence: HTML with real 404 or clear not-found markers ---
     {"name": "PyPI", "category": "code",
      "profile": "https://pypi.org/user/{u}/",
      "check": "https://pypi.org/user/{u}/",
-     "kind": "html", "not_found": [], "confidence": "high"},
+     "kind": "html",
+     "not_found": ["user not found", "page not found", "no such user", "not found"],
+     "confidence": "high"},
 
     {"name": "Dev.to", "category": "writing",
      "profile": "https://dev.to/{u}",
