@@ -12,7 +12,14 @@ import json
 import os
 import sys
 
-from backend.core.runner import SentEyeRunner
+# Load .env file if present (contains API keys, gitignored).
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv()
+except ImportError:
+    pass
+
+from backend.core.runner import SentEyeRunner, MODULE_REGISTRY
 from backend.modules.base import TargetType
 
 BANNER = r"""
@@ -40,11 +47,38 @@ def infer_target_type(arg: str) -> TargetType:
     return TargetType.IMAGE
 
 
+def print_modules() -> None:
+    """Print all registered modules grouped by target type."""
+    print()
+    print("  Sent Eye — Available Modules")
+    print("  " + "=" * 60)
+    print()
+
+    by_type = {}
+    for cls in MODULE_REGISTRY:
+        for tt in cls.target_types:
+            by_type.setdefault(tt.value, []).append(cls)
+
+    for type_name in sorted(by_type.keys()):
+        print(f"  [{type_name.upper()}]")
+        for cls in sorted(by_type[type_name], key=lambda c: c.name):
+            mod = cls()
+            print(f"    {mod.name:22} {mod.description}")
+        print()
+
+    print("  " + "=" * 60)
+    print("  Usage:")
+    print("    python sent_eye.py <target> --type <type>")
+    print("    python sent_eye.py <target>              # auto-detects image/username/email/phone")
+    print("    python sent_eye.py <dir>                 # batch mode for images")
+    print()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Sent Eye: analyze an image with OSINT modules."
     )
-    parser.add_argument("image", help="Path to the image file to analyze.")
+    parser.add_argument("image", nargs="?", help="Target (file path, username, email, phone, etc.).")
     parser.add_argument("-o", "--output", help="Write the JSON report to this file.")
     parser.add_argument("--html", help="Write an HTML report to this file.")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON.")
@@ -77,11 +111,26 @@ def main() -> int:
              "domain, vin, mac, plate, coords. Default: auto-detect.",
     )
     parser.add_argument(
+        "--list-modules",
+        action="store_true",
+        help="List all available modules grouped by target type, then exit.",
+    )
+    parser.add_argument(
         "-r", "--recursive",
         action="store_true",
         help="In batch mode, recurse into subdirectories.",
     )
     args = parser.parse_args()
+
+    if args.list_modules:
+        print_modules()
+        return 0
+
+    if not args.image:
+        parser.print_help()
+        print("\nError: target argument is required (or use --list-modules).", file=sys.stderr)
+        return 1
+
 
     if not args.no_banner:
         print(BANNER, file=sys.stderr)
