@@ -4,10 +4,12 @@ from typing import Dict, List, Type
 
 from backend.modules.base import BaseModule
 from backend.modules.metadata import MetadataModule
+from backend.modules.reverse_search import ReverseSearchModule
 
 # Central registry. Add new modules here as we build them.
 MODULE_REGISTRY: List[Type[BaseModule]] = [
     MetadataModule,
+    ReverseSearchModule,
 ]
 
 class SentEyeRunner:

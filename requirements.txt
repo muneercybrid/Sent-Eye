@@ -1,2 +1,2 @@
 # Core dependencies for Sent-Eye
-# We will add more as we build new modules (e.g., PicImageSearch, face_recognition)
+PicImageSearch>=3.10.0
