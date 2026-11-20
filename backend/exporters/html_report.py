@@ -175,6 +175,8 @@ class HTMLReporter:
             parts.append(self._render_reverse_search(findings))
         elif name == "face_analysis":
             parts.append(self._render_face_analysis(findings, target=target, status=status))
+        elif name == "username_enumeration":
+            parts.append(self._render_username_enumeration(findings, status=status))
         else:
             parts.append(self._render_generic(findings))
 
@@ -355,6 +357,75 @@ class HTMLReporter:
                     )
                 parts.append('</table>')
             parts.append('</div>')
+
+        return "\n".join(parts)
+
+    def _render_username_enumeration(self, findings, status=None):
+        if not findings:
+            return '<p style="color:#94a3b8;">No sites were checked.</p>'
+
+        claimed = [f for f in findings if f.get("status") == "claimed"]
+        available = [f for f in findings if f.get("status") == "available"]
+        ambiguous = [f for f in findings if f.get("status") in ("ambiguous", "error")]
+
+        parts = []
+        parts.append(
+            '<div class="stats">'
+            f'<div class="stat"><div class="stat-value">{len(claimed)}</div>'
+            f'<div class="stat-label">Claimed</div></div>'
+            f'<div class="stat"><div class="stat-value">{len(available)}</div>'
+            f'<div class="stat-label">Available</div></div>'
+            f'<div class="stat"><div class="stat-value">{len(ambiguous)}</div>'
+            f'<div class="stat-label">Ambiguous</div></div>'
+            '</div>'
+        )
+
+        if claimed:
+            parts.append('<h4 style="color:#38bdf8;margin:20px 0 8px 0;">Claimed Profiles</h4>')
+            parts.append('<table><tr><th>Site</th><th>Category</th><th>Profile URL</th></tr>')
+            for f in sorted(claimed, key=lambda x: x.get("name", "")):
+                parts.append(
+                    f'<tr><td><strong>{_esc(f.get("name", ""))}</strong></td>'
+                    f'<td>{_esc(f.get("category", ""))}</td>'
+                    f'<td><a href="{_esc(f.get("url", "#"))}" target="_blank">'
+                    f'{_esc(f.get("url", ""))}</a></td></tr>'
+                )
+            parts.append('</table>')
+        else:
+            parts.append(
+                '<p style="color:#94a3b8;margin-top:16px;">'
+                'No profiles found — username appears unclaimed across all checked sites.'
+                '</p>'
+            )
+
+        if available:
+            parts.append(
+                f'<details class="meta-group"><summary><strong>Available '
+                f'<span style="color:#64748b;">({len(available)})</span></summary>'
+            )
+            parts.append('<table><tr><th>Site</th><th>URL</th></tr>')
+            for f in sorted(available, key=lambda x: x.get("name", "")):
+                parts.append(
+                    f'<tr><td>{_esc(f.get("name", ""))}</td>'
+                    f'<td><a href="{_esc(f.get("url", "#"))}" target="_blank">'
+                    f'{_esc(f.get("url", ""))}</a></td></tr>'
+                )
+            parts.append('</table></details>')
+
+        if ambiguous:
+            parts.append(
+                f'<details class="meta-group"><summary><strong>Ambiguous / Errors '
+                f'<span style="color:#64748b;">({len(ambiguous)})</span></summary>'
+            )
+            parts.append('<table><tr><th>Site</th><th>Status</th><th>Detail</th></tr>')
+            for f in sorted(ambiguous, key=lambda x: x.get("name", "")):
+                detail = f.get("error") or f'HTTP {f.get("http_code")}'
+                parts.append(
+                    f'<tr><td>{_esc(f.get("name", ""))}</td>'
+                    f'<td>{_esc(f.get("status", ""))}</td>'
+                    f'<td>{_esc(detail)}</td></tr>'
+                )
+            parts.append('</table></details>')
 
         return "\n".join(parts)
 

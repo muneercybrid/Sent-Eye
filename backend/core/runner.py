@@ -7,12 +7,14 @@ from backend.modules.metadata import MetadataModule
 from backend.modules.reverse_search import ReverseSearchModule
 from backend.modules.geolocation import GeolocationModule
 from backend.modules.face_analysis import FaceAnalysisModule
+from backend.modules.username import UsernameModule
 
 MODULE_REGISTRY: List[Type[BaseModule]] = [
     MetadataModule,
     GeolocationModule,
     ReverseSearchModule,
     FaceAnalysisModule,
+    UsernameModule,
 ]
 
 
