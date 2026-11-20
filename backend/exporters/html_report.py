@@ -131,7 +131,7 @@ class HTMLReporter:
             )
         return "\n".join(rows)
 
-    def _render_module(self, name: str, data: Dict[str, Any]) -> str:
+    def _render_module(self, name: str, data: Dict[str, Any], target=None) -> str:
         parts = [f"<h2>{_esc(name)}</h2>"]
         parts.append(f"<p style='color:#94a3b8;'>{_esc(data.get('description', ''))}</p>")
 
@@ -150,7 +150,7 @@ class HTMLReporter:
         elif name == "reverse_image_search":
             parts.append(self._render_reverse_search(findings))
         elif name == "face_analysis":
-            parts.append(self._render_face_analysis(findings))
+            parts.append(self._render_face_analysis(findings, target=target))
         else:
             parts.append(self._render_generic(findings))
 
@@ -222,11 +222,12 @@ class HTMLReporter:
             )
         return f'<div class="result-grid">{"".join(cards)}</div>'
 
-    def _render_face_analysis(self, findings):
+    def _render_face_analysis(self, findings, target=None):
         if not findings:
             return "<p>No faces detected in the image.</p>"
 
-        target = self.report.get("target", "")
+        if target is None:
+            target = self.report.get("target", "")
         data_uri = _load_image_as_data_uri(target) if target else None
         dims = _get_image_dimensions(target) if target else None
 

@@ -48,6 +48,11 @@ def main() -> int:
         metavar="DIR",
         help="Directory of reference face images for matching.",
     )
+    parser.add_argument(
+        "-r", "--recursive",
+        action="store_true",
+        help="In batch mode, recurse into subdirectories.",
+    )
     args = parser.parse_args()
 
     if not args.no_banner:
@@ -81,10 +86,21 @@ def main() -> int:
             return 4
         os.environ["SENT_EYE_FACE_DB"] = args.face_db
 
+    is_batch = os.path.isdir(args.image)
     try:
-        runner = SentEyeRunner(args.image)
-        report = asyncio.run(runner.run_all())
+        if is_batch:
+            from backend.core.batch import SentEyeBatchRunner
+            def _progress(i, total, path):
+                print(f"[{i}/{total}] {os.path.basename(path)}", file=sys.stderr)
+            batch_runner = SentEyeBatchRunner(args.image, recursive=args.recursive)
+            report = asyncio.run(batch_runner.run_all(on_progress=_progress))
+        else:
+            runner = SentEyeRunner(args.image)
+            report = asyncio.run(runner.run_all())
     except FileNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except NotADirectoryError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     except Exception as exc:
@@ -100,8 +116,12 @@ def main() -> int:
         print(json.dumps(report, indent=2 if args.pretty else None, default=str))
 
     if args.html:
-        from backend.exporters.html_report import HTMLReporter
-        html_content = HTMLReporter(report).render()
+        if is_batch:
+            from backend.exporters.batch_html import BatchHTMLReporter
+            html_content = BatchHTMLReporter(report).render()
+        else:
+            from backend.exporters.html_report import HTMLReporter
+            html_content = HTMLReporter(report).render()
         with open(args.html, "w", encoding="utf-8") as fh:
             fh.write(html_content)
         print(f"HTML report written to {args.html}", file=sys.stderr)
