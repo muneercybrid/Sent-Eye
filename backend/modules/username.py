@@ -51,12 +51,13 @@ SITES: List[Dict[str, Any]] = [
      "confidence": "high"},
 
     # --- High confidence: HTML with real 404 or clear not-found markers ---
+    # PyPI serves HTTP 200 for unknown users with no reliable HTML marker,
+    # so we cannot confirm claims via scraping. Demoted to low confidence:
+    # shows up under "Unverified" and the user must click to check.
     {"name": "PyPI", "category": "code",
      "profile": "https://pypi.org/user/{u}/",
      "check": "https://pypi.org/user/{u}/",
-     "kind": "html",
-     "not_found": ["user not found", "page not found", "no such user", "not found"],
-     "confidence": "high"},
+     "kind": "html", "not_found": [], "confidence": "low"},
 
     {"name": "Dev.to", "category": "writing",
      "profile": "https://dev.to/{u}",
