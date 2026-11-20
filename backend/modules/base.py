@@ -15,6 +15,7 @@ class ModuleResult:
     findings: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
 
 class BaseModule(ABC):
     """

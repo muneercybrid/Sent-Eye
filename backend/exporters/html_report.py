@@ -141,23 +141,24 @@ class HTMLReporter:
         status = data.get("status", "unknown")
         findings = data.get("findings", [])
         errors = data.get("errors", [])
+        warnings = data.get("warnings", [])
 
         parts = [f"<{header}>{_esc(name)}</{header}>"]
         parts.append(f"<p style='color:#94a3b8;'>{_esc(data.get('description', ''))}</p>")
 
-        # Red error card only when module truly failed / produced nothing
-        if errors and (status == "failed" or not findings):
+        if errors:
             parts.append('<div class="card" style="border-left:4px solid #ef4444;"><h3>Errors</h3>')
             for err in errors:
                 parts.append(f'<p class="error">* {_esc(err)}</p>')
             parts.append("</div>")
-        elif errors:
+
+        if warnings:
             parts.append(
                 f'<details class="meta-group"><summary style="color:#eab308;">'
-                f'Warnings ({len(errors)})</summary>'
+                f'Warnings ({len(warnings)})</summary>'
             )
-            for err in errors:
-                parts.append(f'<p class="warning">* {_esc(err)}</p>')
+            for w in warnings:
+                parts.append(f'<p class="warning">* {_esc(w)}</p>')
             parts.append('</details>')
 
         if name == "metadata_extraction":

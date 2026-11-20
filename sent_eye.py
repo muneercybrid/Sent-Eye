@@ -49,6 +49,12 @@ def main() -> int:
         help="Directory of reference face images for matching.",
     )
     parser.add_argument(
+        "--engines",
+        metavar="LIST",
+        help="Comma-separated reverse-image engines: yandex, tineye, google_lens, all. "
+             "Default: yandex.",
+    )
+    parser.add_argument(
         "-r", "--recursive",
         action="store_true",
         help="In batch mode, recurse into subdirectories.",
@@ -73,6 +79,20 @@ def main() -> int:
             file=sys.stderr,
         )
         return 3
+
+    if args.engines:
+        from backend.modules.reverse_search import ENGINE_FACTORIES
+        requested = (
+            list(ENGINE_FACTORIES.keys())
+            if args.engines.strip().lower() == "all"
+            else [e.strip().lower() for e in args.engines.split(",") if e.strip()]
+        )
+        unknown = [e for e in requested if e not in ENGINE_FACTORIES]
+        if unknown:
+            print(f"Error: unknown engine(s): {', '.join(unknown)}", file=sys.stderr)
+            print(f"Available: {', '.join(ENGINE_FACTORIES.keys())}", file=sys.stderr)
+            return 5
+        os.environ["SENT_EYE_ENGINES"] = args.engines
 
     if args.analyze_faces:
         os.environ["SENT_EYE_ENABLE_FACES"] = "1"

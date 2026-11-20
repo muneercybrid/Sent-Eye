@@ -35,6 +35,7 @@ class SentEyeRunner:
                 "findings": result.findings,
                 "metadata": result.metadata,
                 "errors": result.errors,
+                "warnings": getattr(result, "warnings", []),
             }
 
         return {
