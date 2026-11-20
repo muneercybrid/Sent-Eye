@@ -181,6 +181,8 @@ class HTMLReporter:
             parts.append(self._render_email_intel(findings, status=status))
         elif name == "vin_decode":
             parts.append(self._render_vin_decode(findings, status=status))
+        elif name == "phone_intel":
+            parts.append(self._render_phone_intel(findings, status=status))
         else:
             parts.append(self._render_generic(findings))
 
@@ -670,6 +672,119 @@ class HTMLReporter:
                         f'<td><strong>{_esc(r.get("component", ""))}</strong></td>'
                         f'<td style="font-size:0.9em;">{_esc(r.get("summary", ""))}</td></tr>'
                     )
+                parts.append('</table>')
+
+        return "\n".join(parts)
+
+    def _render_phone_intel(self, findings, status=None):
+        if not findings:
+            return '<p style="color:#94a3b8;">Phone number was not parsed.</p>'
+
+        identity = next((f for f in findings if f.get("category") == "identity"), None)
+        verification = next((f for f in findings if f.get("category") == "verification"), None)
+
+        parts = []
+
+        if identity:
+            valid = identity.get("valid")
+            possible = identity.get("possible")
+            if valid:
+                badge_bg, badge_fg, badge_txt = "#166534", "#86efac", "VALID"
+            elif possible:
+                badge_bg, badge_fg, badge_txt = "#854d0e", "#fde047", "POSSIBLE"
+            else:
+                badge_bg, badge_fg, badge_txt = "#991b1b", "#fca5a5", "INVALID"
+
+            parts.append('<div class="card" style="border-left:4px solid #38bdf8;">')
+            parts.append(
+                f'<div style="font-size:2em;font-weight:700;color:#38bdf8;margin:0 0 12px 0;">'
+                f'{_esc(identity.get("international", ""))}'
+                '</div>'
+            )
+            parts.append(
+                f'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">'
+                f'<span style="background:{badge_bg};color:{badge_fg};padding:4px 12px;'
+                f'border-radius:12px;font-size:0.8em;font-weight:700;">{badge_txt}</span>'
+                f'<span style="color:#94a3b8;">{_esc(identity.get("line_type", ""))}</span>'
+                f'<span style="color:#94a3b8;">Region: <strong>{_esc(identity.get("region", ""))}</strong></span>'
+                '</div>'
+            )
+            parts.append('<table class="meta-table">')
+            fields = [
+                ("E.164", identity.get("e164")),
+                ("National format", identity.get("national")),
+                ("Country code", identity.get("country_code")),
+                ("Line type", identity.get("line_type")),
+                ("Carrier", identity.get("carrier")),
+                ("Location", identity.get("location")),
+                ("Timezones", ", ".join(identity.get("timezones") or []) or None),
+            ]
+            for label, value in fields:
+                if value is not None and value != "":
+                    parts.append(
+                        f'<tr><td>{_esc(label)}</td><td>{_esc(value)}</td></tr>'
+                    )
+            parts.append('</table></div>')
+
+        if verification:
+            status_str = verification.get("status")
+            if status_str == "ok":
+                color, label = "#22c55e", "LIVE CONFIRMED"
+            elif status_str == "warning":
+                color, label = "#eab308", "LIVE WARNING"
+            else:
+                color, label = "#ef4444", "LIVE ERROR"
+            parts.append(
+                f'<h4 style="color:{color};margin:20px 0 8px 0;">'
+                f'Live Verification — {label}</h4>'
+            )
+            parts.append(
+                f'<p style="color:#94a3b8;margin:0 0 8px 0;">'
+                f'{_esc(verification.get("detail", ""))}</p>'
+            )
+            
+            vfields = [
+                ("Carrier (live)", verification.get("carrier_live")),
+                ("Location (live)", verification.get("location_live")),
+                ("Line type (live)", verification.get("line_type_live")),
+                ("Line status (live)", verification.get("line_status_live")),
+                ("Country", verification.get("country_name")),
+                ("VoIP", "Yes" if verification.get("is_voip") else "No" if verification.get("is_voip") is False else None),
+                ("MCC / MNC", (
+                    f"{verification.get('mcc')} / {verification.get('mnc')}"
+                    if verification.get("mcc") or verification.get("mnc")
+                    else None
+                )),
+                ("SMS gateway domain", verification.get("sms_domain")),
+                ("SMS gateway email", verification.get("sms_email")),
+                ("Registered to", verification.get("registration_name")),
+                ("Registration type", verification.get("registration_type")),
+                ("Risk level", verification.get("risk_level")),
+                ("Disposable", "Yes" if verification.get("is_disposable") else None),
+                ("Abuse detected", "Yes" if verification.get("is_abuse_detected") else None),
+                ("Known breaches", (
+                    str(verification.get("total_breaches"))
+                    if verification.get("total_breaches") is not None
+                    else None
+                )),
+            ]
+            visible = [(k, v) for k, v in vfields if v not in (None, "", "unknown")]
+            if visible:
+                parts.append('<table class="meta-table">')
+                for label, value in visible:
+                    parts.append(
+                        f'<tr><td>{_esc(label)}</td><td>{_esc(value)}</td></tr>'
+                    )
+                parts.append('</table>')
+
+            breached = verification.get("breached_domains") or []
+            if breached:
+                parts.append(
+                    '<h4 style="color:#fca5a5;margin:20px 0 8px 0;">Breached Domains</h4>'
+                )
+                parts.append('<table><tr><th>Domain</th></tr>')
+                for d in breached:
+                    parts.append(f'<tr><td><code>{_esc(d)}</code></td></tr>')
                 parts.append('</table>')
 
         return "\n".join(parts)
