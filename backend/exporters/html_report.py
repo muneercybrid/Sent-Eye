@@ -27,6 +27,12 @@ a:hover{text-decoration:underline;}
 .result-card small{color:#94a3b8;margin-top:auto;font-size:0.8em;padding-top:8px;}
 iframe{border:0;border-radius:8px;margin-top:12px;background:#fff;}
 .summary-bar{background:#1e293b;padding:12px 20px;border-radius:8px;margin:12px 0;}
+.meta-group{background:#0f172a;border-radius:6px;padding:8px 16px;margin:8px 0;}
+.meta-group summary{cursor:pointer;padding:6px 0;color:#bae6fd;font-size:0.95em;}
+.meta-group summary:hover{color:#7dd3fc;}
+.meta-group[open] summary{margin-bottom:8px;}
+.meta-group table{margin:0;}
+.warning{color:#facc15;margin:4px 0;}
 """
 
 _STATUS_COLORS = {
@@ -131,50 +137,106 @@ class HTMLReporter:
             )
         return "\n".join(rows)
 
-    def _render_module(self, name: str, data: Dict[str, Any], target=None) -> str:
-        parts = [f"<h2>{_esc(name)}</h2>"]
+    def _render_module(self, name: str, data: Dict[str, Any], target=None, header="h2") -> str:
+        status = data.get("status", "unknown")
+        findings = data.get("findings", [])
+        errors = data.get("errors", [])
+
+        parts = [f"<{header}>{_esc(name)}</{header}>"]
         parts.append(f"<p style='color:#94a3b8;'>{_esc(data.get('description', ''))}</p>")
 
-        errors = data.get("errors", [])
-        if errors:
-            parts.append('<div class="card"><h3>Errors</h3>')
+        # Red error card only when module truly failed / produced nothing
+        if errors and (status == "failed" or not findings):
+            parts.append('<div class="card" style="border-left:4px solid #ef4444;"><h3>Errors</h3>')
             for err in errors:
                 parts.append(f'<p class="error">* {_esc(err)}</p>')
             parts.append("</div>")
+        elif errors:
+            parts.append(
+                f'<details class="meta-group"><summary style="color:#eab308;">'
+                f'Warnings ({len(errors)})</summary>'
+            )
+            for err in errors:
+                parts.append(f'<p class="warning">* {_esc(err)}</p>')
+            parts.append('</details>')
 
-        findings = data.get("findings", [])
         if name == "metadata_extraction":
-            parts.append(self._render_metadata(findings))
+            parts.append(self._render_metadata(findings, status=status))
         elif name == "geolocation":
-            parts.append(self._render_geolocation(findings))
+            parts.append(self._render_geolocation(findings, status=status))
         elif name == "reverse_image_search":
             parts.append(self._render_reverse_search(findings))
         elif name == "face_analysis":
-            parts.append(self._render_face_analysis(findings, target=target))
+            parts.append(self._render_face_analysis(findings, target=target, status=status))
         else:
             parts.append(self._render_generic(findings))
 
         return "\n".join(parts)
 
-    def _render_metadata(self, findings: List[Dict]) -> str:
-        if not findings:
-            return "<p>No metadata findings.</p>"
-        rows = []
-        for finding in findings:
-            meta = finding.get("metadata", {})
-            for key, value in meta.items():
-                if isinstance(value, str) and "Binary data" in value:
-                    continue
-                if key == "SourceFile":
-                    continue
-                rows.append(f"<tr><td>{_esc(key)}</td><td>{_esc(value)}</td></tr>")
-        if not rows:
-            return "<p>No displayable metadata fields.</p>"
-        return f'<table class="meta-table">{"".join(rows)}</table>'
+    def _render_value(self, value):
+        if not isinstance(value, str):
+            return _esc(value)
+        if len(value) <= 200:
+            return _esc(value)
+        return (
+            f'<details><summary>{_esc(value[:180])}...</summary>'
+            f'<pre style="white-space:pre-wrap;font-size:0.9em;">{_esc(value)}</pre></details>'
+        )
 
-    def _render_geolocation(self, findings: List[Dict]) -> str:
+    def _render_metadata(self, findings: List[Dict], status=None) -> str:
         if not findings:
-            return "<p>No GPS coordinates found.</p>"
+            return "<p>No displayable metadata fields.</p>"
+
+        from .metadata_categories import categorize, category_labels
+
+        merged = {}
+        for finding in findings:
+            for k, v in finding.get("metadata", {}).items():
+                if k == "SourceFile":
+                    continue
+                merged[k] = v
+
+        highlights, categorized, other = categorize(merged)
+        parts = []
+
+        if highlights:
+            parts.append(
+                '<div class="card" style="border-left:4px solid #38bdf8;">'
+                '<h4 style="margin:0 0 12px 0;color:#38bdf8;">Highlights</h4>'
+            )
+            parts.append('<table class="meta-table">')
+            for k, v in highlights.items():
+                parts.append(f"<tr><td>{_esc(k)}</td><td>{self._render_value(v)}</td></tr>")
+            parts.append("</table></div>")
+
+        for cat_key, label in category_labels():
+            items = categorized.get(cat_key, {})
+            if not items:
+                continue
+            parts.append(
+                f'<details class="meta-group" open><summary><strong>{label}</strong> '
+                f'<span style="color:#64748b;">({len(items)})</span></summary>'
+            )
+            parts.append('<table class="meta-table">')
+            for k, v in items.items():
+                parts.append(f"<tr><td>{_esc(k)}</td><td>{self._render_value(v)}</td></tr>")
+            parts.append("</table></details>")
+
+        if other:
+            parts.append(
+                f'<details class="meta-group"><summary><strong>Other</strong> '
+                f'<span style="color:#64748b;">({len(other)})</span></summary>'
+            )
+            parts.append('<table class="meta-table">')
+            for k, v in other.items():
+                parts.append(f"<tr><td>{_esc(k)}</td><td>{self._render_value(v)}</td></tr>")
+            parts.append("</table></details>")
+
+        return "\n".join(parts)
+
+    def _render_geolocation(self, findings: List[Dict], status=None) -> str:
+        if not findings:
+            return '<p style="color:#94a3b8;">No GPS coordinates found in metadata.</p>'
         parts = []
         for f in findings:
             lat = f.get("latitude")
@@ -222,9 +284,11 @@ class HTMLReporter:
             )
         return f'<div class="result-grid">{"".join(cards)}</div>'
 
-    def _render_face_analysis(self, findings, target=None):
+    def _render_face_analysis(self, findings, target=None, status=None):
+        if status == "skipped":
+            return '<p style="color:#94a3b8;">Face analysis was not enabled for this run.</p>'
         if not findings:
-            return "<p>No faces detected in the image.</p>"
+            return '<p style="color:#94a3b8;">No faces detected in the image.</p>' 
 
         if target is None:
             target = self.report.get("target", "")
