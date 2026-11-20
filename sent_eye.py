@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sent-Eye: OSINT tool for image intelligence gathering.
+Sent Eye: OSINT tool for image intelligence gathering.
 
 Usage:
     python sent_eye.py <path-to-image> [--output report.json] [--html report.html] [--pretty]
@@ -26,7 +26,7 @@ BANNER = r"""
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Sent-Eye: analyze an image with OSINT modules."
+        description="Sent Eye: analyze an image with OSINT modules."
     )
     parser.add_argument("image", help="Path to the image file to analyze.")
     parser.add_argument("-o", "--output", help="Write the JSON report to this file.")

@@ -115,12 +115,12 @@ class BatchHTMLReporter(HTMLReporter):
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sent-Eye Batch Report - {_esc(Path(directory).name)}</title>
+<title>Sent Eye Batch Report - {_esc(Path(directory).name)}</title>
 <style>{_CSS}{_BATCH_EXTRA_CSS}</style>
 </head>
 <body>
 <div class="container" id="top">
-<h1>Sent-Eye Batch Report</h1>
+<h1>Sent Eye Batch Report</h1>
 <div class="summary-bar">
   <p style="margin:0 0 6px 0;">Directory: <code>{_esc(directory)}</code></p>
   <p style="margin:0 0 6px 0;">Generated: {_esc(timestamp)}</p>

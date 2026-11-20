@@ -85,7 +85,7 @@ def _get_image_dimensions(path):
 
 
 class HTMLReporter:
-    """Renders a Sent-Eye JSON report as a self-contained HTML dossier."""
+    """Renders a Sent Eye JSON report as a self-contained HTML dossier."""
 
     def __init__(self, report: Dict[str, Any]):
         self.report = report
@@ -105,12 +105,12 @@ class HTMLReporter:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sent-Eye Report - {_esc(target_name)}</title>
+<title>Sent Eye Report - {_esc(target_name)}</title>
 <style>{_CSS}</style>
 </head>
 <body>
 <div class="container">
-<h1>Sent-Eye Intelligence Report</h1>
+<h1>Sent Eye Intelligence Report</h1>
 <div class="summary-bar">
   <p style="margin:0 0 6px 0;">Target: <code>{_esc(target)}</code></p>
   <p style="margin:0 0 6px 0;">Generated: {_esc(timestamp)}</p>
