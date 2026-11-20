@@ -10,6 +10,8 @@ from backend.modules.face_analysis import FaceAnalysisModule
 from backend.modules.username import UsernameModule
 from backend.modules.email import EmailModule
 from backend.modules.vin import VINModule
+from backend.modules.phone import PhoneModule
+from backend.modules.ip import IPModule
 
 MODULE_REGISTRY: List[Type[BaseModule]] = [
     MetadataModule,
@@ -19,6 +21,8 @@ MODULE_REGISTRY: List[Type[BaseModule]] = [
     UsernameModule,
     EmailModule,
     VINModule,
+    PhoneModule,
+    IPModule,
 ]
 
 

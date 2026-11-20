@@ -183,6 +183,8 @@ class HTMLReporter:
             parts.append(self._render_vin_decode(findings, status=status))
         elif name == "phone_intel":
             parts.append(self._render_phone_intel(findings, status=status))
+        elif name == "ip_intel":
+            parts.append(self._render_ip_intel(findings, status=status))
         else:
             parts.append(self._render_generic(findings))
 
@@ -786,6 +788,80 @@ class HTMLReporter:
                 for d in breached:
                     parts.append(f'<tr><td><code>{_esc(d)}</code></td></tr>')
                 parts.append('</table>')
+
+        return "\n".join(parts)
+
+    def _render_ip_intel(self, findings, status=None):
+        if not findings:
+            return '<p style="color:#94a3b8;">No IP data was resolved.</p>'
+
+        identity = next((f for f in findings if f.get("category") == "identity"), None)
+        geo = next((f for f in findings if f.get("category") == "geo"), None)
+        rev = next((f for f in findings if f.get("category") == "network"), None)
+
+        parts = []
+
+        if identity:
+            ip_str = identity.get("ip", "")
+            version = identity.get("version")
+            flags = []
+            if identity.get("is_private"): flags.append("Private")
+            if identity.get("is_reserved"): flags.append("Reserved")
+            if identity.get("is_loopback"): flags.append("Loopback")
+            flag_txt = " • ".join(flags) if flags else "Public"
+
+            parts.append('<div class="card" style="border-left:4px solid #38bdf8;">')
+            parts.append(
+                f'<div style="font-size:2em;font-weight:700;color:#38bdf8;margin:0 0 8px 0;">'
+                f'{_esc(ip_str)}</div>'
+            )
+            parts.append(
+                f'<div style="color:#94a3b8;">IPv{version} • {_esc(flag_txt)}</div>'
+            )
+            if rev:
+                parts.append(
+                    f'<div style="margin-top:12px;"><strong>Reverse DNS:</strong> '
+                    f'<code>{_esc(rev.get("detail", ""))}</code></div>'
+                )
+            parts.append('</div>')
+
+        if geo:
+            parts.append(
+                '<h4 style="color:#38bdf8;margin:20px 0 8px 0;">Geolocation & Network</h4>'
+            )
+            parts.append(
+                f'<p style="color:#94a3b8;margin:0 0 12px 0;">'
+                f'Source: <code>{_esc(geo.get("source", ""))}</code></p>'
+            )
+            parts.append('<table class="meta-table">')
+            fields = [
+                ("Country", geo.get("country")),
+                ("Country code", geo.get("country_code")),
+                ("Region", geo.get("region")),
+                ("City", geo.get("city")),
+                ("Latitude", geo.get("latitude")),
+                ("Longitude", geo.get("longitude")),
+                ("Timezone", geo.get("timezone")),
+                ("ASN", geo.get("asn")),
+                ("Organization", geo.get("org")),
+                ("ISP", geo.get("isp")),
+            ]
+            for label, value in fields:
+                if value is not None and value != "":
+                    parts.append(
+                        f'<tr><td>{_esc(label)}</td><td>{_esc(value)}</td></tr>'
+                    )
+            parts.append('</table>')
+
+            lat = geo.get("latitude")
+            lon = geo.get("longitude")
+            if lat is not None and lon is not None:
+                parts.append(
+                    f'<iframe width="100%" height="300" style="margin-top:12px;border-radius:8px;" '
+                    f'src="https://www.openstreetmap.org/export/embed.html?'
+                    f'bbox={float(lon)-0.01},{float(lat)-0.01},{float(lon)+0.01},{float(lat)+0.01}'
+                    f'&layer=mapnik&marker={lat},{lon}"></iframe>'
+                )
 
         return "\n".join(parts)
 
