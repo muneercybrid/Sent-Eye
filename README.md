@@ -33,3 +33,15 @@ Options:
 
 Only analyze images you own or have explicit permission to investigate.
 Respect platform ToS and privacy laws.
+
+## Troubleshooting
+
+### `ModuleNotFoundError: No module named 'pkg_resources'`
+
+setuptools 82.0.0 (Feb 2026) removed `pkg_resources`. `face_recognition_models`
+0.3.0 still imports it. Sent-Eye installs a compatibility shim
+(`backend/compat.py`) at startup, so running via `sent_eye.py` works with
+any setuptools version. If you need `import face_recognition` to work
+outside Sent-Eye, run:
+
+    pip install "setuptools<82"

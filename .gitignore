@@ -17,6 +17,9 @@ env/
 # Sent-Eye outputs
 reports/
 *.report.json
+*_report.html
+report*.html
+!sample_report.html
 
 # OS
 .DS_Store

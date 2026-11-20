@@ -4,10 +4,12 @@ Sent-Eye: OSINT tool for image intelligence gathering.
 
 Usage:
     python sent_eye.py <path-to-image> [--output report.json] [--html report.html] [--pretty]
+    python sent_eye.py <path-to-image> --analyze-faces --acknowledge-consent [--face-db DIR]
 """
 import argparse
 import asyncio
 import json
+import os
 import sys
 
 from backend.core.runner import SentEyeRunner
@@ -36,6 +38,16 @@ def main() -> int:
         action="store_true",
         help="Confirm you have the right to analyze this image.",
     )
+    parser.add_argument(
+        "--analyze-faces",
+        action="store_true",
+        help="Enable facial analysis. Requires --acknowledge-consent.",
+    )
+    parser.add_argument(
+        "--face-db",
+        metavar="DIR",
+        help="Directory of reference face images for matching.",
+    )
     args = parser.parse_args()
 
     if not args.no_banner:
@@ -46,6 +58,28 @@ def main() -> int:
             "WARNING: Only analyze images you own or have permission to investigate.",
             file=sys.stderr,
         )
+
+    # Face analysis is gated behind two independent confirmations.
+    if args.analyze_faces and not args.acknowledge_consent:
+        print(
+            "ERROR: --analyze-faces requires --acknowledge-consent.\n"
+            "       Face analysis is only permitted on images you own or "
+            "have explicit written permission to analyze.",
+            file=sys.stderr,
+        )
+        return 3
+
+    if args.analyze_faces:
+        os.environ["SENT_EYE_ENABLE_FACES"] = "1"
+
+    if args.face_db:
+        if not os.path.isdir(args.face_db):
+            print(
+                f"ERROR: --face-db directory not found: {args.face_db}",
+                file=sys.stderr,
+            )
+            return 4
+        os.environ["SENT_EYE_FACE_DB"] = args.face_db
 
     try:
         runner = SentEyeRunner(args.image)
