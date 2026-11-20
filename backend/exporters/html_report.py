@@ -185,6 +185,8 @@ class HTMLReporter:
             parts.append(self._render_phone_intel(findings, status=status))
         elif name == "ip_intel":
             parts.append(self._render_ip_intel(findings, status=status))
+        elif name == "domain_intel":
+            parts.append(self._render_domain_intel(findings, status=status))
         else:
             parts.append(self._render_generic(findings))
 
@@ -862,6 +864,64 @@ class HTMLReporter:
                     f'bbox={float(lon)-0.01},{float(lat)-0.01},{float(lon)+0.01},{float(lat)+0.01}'
                     f'&layer=mapnik&marker={lat},{lon}"></iframe>'
                 )
+
+        return "\n".join(parts)
+
+    def _render_domain_intel(self, findings, status=None):
+        if not findings:
+            return '<p style="color:#94a3b8;">No domain data resolved.</p>'
+
+        identity = next((f for f in findings if f.get("category") == "identity"), None)
+        rdap = next((f for f in findings if f.get("category") == "rdap"), None)
+        dns = next((f for f in findings if f.get("category") == "dns"), None)
+        subs = next((f for f in findings if f.get("category") == "subdomains"), None)
+
+        parts = []
+
+        if identity:
+            parts.append('<div class="card" style="border-left:4px solid #38bdf8;">')
+            parts.append(
+                f'<div style="font-size:2em;font-weight:700;color:#38bdf8;margin:0 0 8px 0;">'
+                f'{_esc(identity.get("domain", ""))}</div>'
+            )
+            parts.append('</div>')
+
+        if rdap and rdap.get("status") == "ok":
+            parts.append('<h4 style="color:#38bdf8;margin:20px 0 8px 0;">Registration (RDAP)</h4>')
+            parts.append('<table class="meta-table">')
+            fields = [
+                ("Registrar", rdap.get("registrar")),
+                ("Registered", rdap.get("registered")),
+                ("Expires", rdap.get("expires")),
+                ("Last changed", rdap.get("last_changed")),
+                ("Nameservers", ", ".join(rdap.get("nameservers", []))),
+                ("Status", ", ".join(rdap.get("status", []))),
+            ]
+            for label, val in fields:
+                if val:
+                    parts.append(f'<tr><td>{_esc(label)}</td><td>{_esc(val)}</td></tr>')
+            parts.append('</table>')
+
+        if dns and dns.get("records"):
+            parts.append('<h4 style="color:#38bdf8;margin:20px 0 8px 0;">DNS Records</h4>')
+            parts.append('<table>')
+            for rtype, vals in dns["records"].items():
+                parts.append(f'<tr><td style="width:80px;"><strong>{rtype}</strong></td><td>')
+                for v in vals:
+                    parts.append(f'<div style="font-family:monospace;font-size:0.9em;margin-bottom:4px;">{_esc(v)}</div>')
+                parts.append('</td></tr>')
+            parts.append('</table>')
+
+        if subs and subs.get("subdomains"):
+            sub_list = subs["subdomains"]
+            parts.append(
+                f'<details class="meta-group" open><summary><strong>Subdomains (CT Logs)</strong> '
+                f'<span style="color:#64748b;">({len(sub_list)})</span></summary>'
+                '<table class="meta-table">'
+            )
+            for s in sub_list:
+                parts.append(f'<tr><td><code>{_esc(s)}</code></td></tr>')
+            parts.append('</table></details>')
 
         return "\n".join(parts)
 

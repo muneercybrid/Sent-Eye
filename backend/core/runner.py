@@ -12,6 +12,7 @@ from backend.modules.email import EmailModule
 from backend.modules.vin import VINModule
 from backend.modules.phone import PhoneModule
 from backend.modules.ip import IPModule
+from backend.modules.domain import DomainModule
 
 MODULE_REGISTRY: List[Type[BaseModule]] = [
     MetadataModule,
@@ -23,6 +24,7 @@ MODULE_REGISTRY: List[Type[BaseModule]] = [
     VINModule,
     PhoneModule,
     IPModule,
+    DomainModule,
 ]
 
 
