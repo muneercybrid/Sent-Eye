@@ -46,8 +46,13 @@ class ReverseSearchModule(BaseModule):
     name = "reverse_image_search"
     description = "Searches the configured reverse-image engines for visually similar images."
 
-    def __init__(self):
-        self.engines = _parse_engines(os.environ.get("SENT_EYE_ENGINES"))
+    def __init__(self, engines=None):
+        raw_engines = (
+            os.environ.get("SENT_EYE_ENGINES")
+            if engines is None
+            else engines
+        )
+        self.engines = _parse_engines(raw_engines)
 
     async def run(self, image_path: str) -> ModuleResult:
         findings = []

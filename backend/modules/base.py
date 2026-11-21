@@ -43,9 +43,11 @@ class BaseModule(ABC):
     target_types: Set["TargetType"] = {TargetType.IMAGE}
 
     @abstractmethod
-    async def run(self, image_path: str) -> ModuleResult:
+    async def run(self, target: str) -> ModuleResult:
         """
-        Execute the module against a given image file path.
+        Execute the module against a target value.
+        For image modules this is a filesystem path; for other target
+        types it is the raw string (username, email, IP, domain, etc.).
         Must return a ModuleResult, never raise an exception.
         """
         pass

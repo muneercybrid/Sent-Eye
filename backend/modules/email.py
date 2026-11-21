@@ -49,7 +49,6 @@ class EmailModule(BaseModule):
     target_types = {TargetType.EMAIL}
 
     def __init__(self):
-        self.hibp_key = os.environ.get("HIBP_API_KEY", "").strip()
         try:
             self.timeout = float(os.environ.get("SENT_EYE_EMAIL_TIMEOUT", "10"))
         except ValueError:
@@ -96,15 +95,15 @@ class EmailModule(BaseModule):
         async with httpx.AsyncClient(
             headers=headers, timeout=self.timeout, follow_redirects=True
         ) as client:
-            mx_result, gravatar_result, hibp_result = await asyncio.gather(
+            mx_result, gravatar_result, xon_result = await asyncio.gather(
                 self._mx_lookup(domain),
                 self._check_gravatar(client, email),
-                self._check_hibp(client, email),
+                self._check_xposedornot(client, email),
             )
 
         findings.extend(mx_result)
         findings.extend(gravatar_result)
-        findings.extend(hibp_result)
+        findings.extend(xon_result)
 
         if not HAS_DNS:
             warnings.append(
@@ -130,7 +129,7 @@ class EmailModule(BaseModule):
                 "checks_run": len(findings),
                 "is_role_account": is_role,
                 "is_disposable": is_disposable,
-                "hibp_key_present": bool(self.hibp_key),
+                "breach_intel_provider": "XposedOrNot",
             },
             warnings=warnings,
         )
@@ -250,72 +249,220 @@ class EmailModule(BaseModule):
                 "detail": f"Gravatar lookup failed: {type(exc).__name__}",
             }]
 
-    async def _check_hibp(self, client, email: str) -> List[Dict[str, Any]]:
-        if not self.hibp_key:
-            return [{
-                "check": "hibp",
-                "category": "breaches",
-                "status": "skipped",
-                "detail": "Set HIBP_API_KEY env var to enable breach checks.",
-            }]
+    async def _check_xposedornot(
+        self, client, email: str
+    ) -> List[Dict[str, Any]]:
+        """Retrieve email breach analytics from XposedOrNot."""
 
-        url = f"https://haveibeenpwned.com/api/v3/breachedaccount/{email}"
+        url = "https://api.xposedornot.com/v1/breach-analytics"
+
         try:
-            resp = await client.get(
-                url,
-                headers={"hibp-api-key": self.hibp_key, "User-Agent": "Sent-Eye"},
-                params={"truncateResponse": "false"},
-            )
+            resp = await client.get(url, params={"email": email})
+
             if resp.status_code == 404:
                 return [{
-                    "check": "hibp",
+                    "check": "xposedornot",
                     "category": "breaches",
                     "status": "ok",
-                    "detail": "No breaches found in Have I Been Pwned.",
-                }]
-            if resp.status_code == 401:
-                return [{
-                    "check": "hibp",
-                    "category": "breaches",
-                    "status": "error",
-                    "detail": "HIBP API key rejected.",
-                }]
-            if resp.status_code == 429:
-                return [{
-                    "check": "hibp",
-                    "category": "breaches",
-                    "status": "warning",
-                    "detail": "HIBP rate-limited — try again later.",
-                }]
-            if resp.status_code != 200:
-                return [{
-                    "check": "hibp",
-                    "category": "breaches",
-                    "status": "error",
-                    "detail": f"HIBP returned HTTP {resp.status_code}.",
+                    "detail": "No matching breach records were found.",
+                    "provider": "XposedOrNot",
+                    "breach_count": 0,
                 }]
 
-            breaches = resp.json()
-            return [{
-                "check": "hibp",
+            if resp.status_code == 429:
+                return [{
+                    "check": "xposedornot",
+                    "category": "breaches",
+                    "status": "warning",
+                    "detail": (
+                        "XposedOrNot rate limit reached. "
+                        "Retry after the provider's limit resets."
+                    ),
+                    "provider": "XposedOrNot",
+                }]
+
+            if resp.status_code in (502, 503, 504):
+                return [{
+                    "check": "xposedornot",
+                    "category": "breaches",
+                    "status": "warning",
+                    "detail": (
+                        f"XposedOrNot is temporarily unavailable "
+                        f"(HTTP {resp.status_code})."
+                    ),
+                    "provider": "XposedOrNot",
+                }]
+
+            if resp.status_code != 200:
+                return [{
+                    "check": "xposedornot",
+                    "category": "breaches",
+                    "status": "error",
+                    "detail": (
+                        f"XposedOrNot returned HTTP {resp.status_code}."
+                    ),
+                    "provider": "XposedOrNot",
+                }]
+
+            payload = resp.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Unexpected API response format")
+
+            exposed = payload.get("ExposedBreaches") or {}
+            if not isinstance(exposed, dict):
+                exposed = {}
+
+            raw_breaches = exposed.get("breaches_details") or []
+            if not isinstance(raw_breaches, list):
+                raw_breaches = []
+
+            breaches = []
+            for item in raw_breaches[:100]:
+                if not isinstance(item, dict):
+                    continue
+
+                raw_data = item.get("xposed_data") or ""
+                if isinstance(raw_data, str):
+                    data_classes = [
+                        value.strip()
+                        for value in raw_data.split(";")
+                        if value.strip()
+                    ]
+                elif isinstance(raw_data, list):
+                    data_classes = [
+                        str(value) for value in raw_data if value
+                    ]
+                else:
+                    data_classes = []
+
+                breaches.append({
+                    "name": item.get("breach"),
+                    "title": item.get("breach"),
+                    "date": item.get("xposed_date"),
+                    "domain": item.get("domain"),
+                    "industry": item.get("industry"),
+                    "pwn_count": item.get("xposed_records"),
+                    "data_classes": data_classes,
+                    "description": item.get("details"),
+                    "password_risk": item.get("password_risk"),
+                    "verified": item.get("verified"),
+                    "searchable": item.get("searchable"),
+                    "reference_url": item.get("references"),
+                    "logo": item.get("logo"),
+                })
+
+            summary = payload.get("BreachesSummary") or {}
+            if not isinstance(summary, dict):
+                summary = {}
+
+            metrics = payload.get("BreachMetrics") or {}
+            if not isinstance(metrics, dict):
+                metrics = {}
+
+            risk_items = metrics.get("risk") or []
+            risk = risk_items[0] if (
+                isinstance(risk_items, list) and risk_items
+                and isinstance(risk_items[0], dict)
+            ) else {}
+
+            password_items = metrics.get("passwords_strength") or []
+            password_strength = password_items[0] if (
+                isinstance(password_items, list) and password_items
+                and isinstance(password_items[0], dict)
+            ) else {}
+
+            paste_summary = payload.get("PastesSummary") or {}
+            if not isinstance(paste_summary, dict):
+                paste_summary = {}
+
+            paste_count = paste_summary.get("cnt", 0)
+            try:
+                paste_count = int(paste_count or 0)
+            except (TypeError, ValueError):
+                paste_count = 0
+
+            summary_site = summary.get("site")
+            has_breach_data = bool(
+                breaches or summary_site or metrics
+            )
+            has_paste_data = paste_count > 0
+
+            if not has_breach_data and not has_paste_data:
+                return [{
+                    "check": "xposedornot",
+                    "category": "breaches",
+                    "status": "ok",
+                    "detail": (
+                        "No matching email breaches or paste exposures "
+                        "were found in XposedOrNot."
+                    ),
+                    "provider": "XposedOrNot",
+                    "breach_count": 0,
+                    "paste_count": 0,
+                }]
+
+            detail_parts = []
+            if breaches:
+                detail_parts.append(
+                    f"Found {len(breaches)} breach record(s)."
+                )
+            if has_paste_data:
+                detail_parts.append(
+                    f"Found {paste_count} paste exposure(s)."
+                )
+
+            finding = {
+                "check": "xposedornot",
                 "category": "breaches",
                 "status": "breached",
-                "detail": f"Found in {len(breaches)} known breach(es).",
-                "breaches": [
-                    {
-                        "name": b.get("Name"),
-                        "title": b.get("Title"),
-                        "date": b.get("BreachDate"),
-                        "pwn_count": b.get("PwnCount"),
-                        "data_classes": b.get("DataClasses", []),
-                    }
-                    for b in breaches[:20]
-                ],
+                "detail": " ".join(detail_parts),
+                "provider": "XposedOrNot",
+                "breach_count": len(breaches),
+                "breaches": breaches,
+                "risk": {
+                    "label": risk.get("risk_label"),
+                    "score": risk.get("risk_score"),
+                },
+                "password_strength": password_strength,
+                "paste_count": paste_count,
+                "paste_summary": {
+                    "domain": paste_summary.get("domain"),
+                    "latest": paste_summary.get("tmpstmp"),
+                },
+                "attribution": "Breach intelligence provided by XposedOrNot.",
+            }
+
+            return [finding]
+
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            return [{
+                "check": "xposedornot",
+                "category": "breaches",
+                "status": "warning",
+                "detail": (
+                    f"XposedOrNot network request failed: "
+                    f"{type(exc).__name__}."
+                ),
+                "provider": "XposedOrNot",
+            }]
+        except (ValueError, TypeError) as exc:
+            return [{
+                "check": "xposedornot",
+                "category": "breaches",
+                "status": "warning",
+                "detail": (
+                    "XposedOrNot returned an unexpected response: "
+                    f"{type(exc).__name__}."
+                ),
+                "provider": "XposedOrNot",
             }]
         except Exception as exc:
             return [{
-                "check": "hibp",
+                "check": "xposedornot",
                 "category": "breaches",
                 "status": "error",
-                "detail": f"HIBP lookup failed: {type(exc).__name__}",
+                "detail": (
+                    f"XposedOrNot lookup failed: {type(exc).__name__}."
+                ),
+                "provider": "XposedOrNot",
             }]

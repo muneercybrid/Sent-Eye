@@ -17,8 +17,12 @@ class FaceAnalysisModule(BaseModule):
     name = "face_analysis"
     description = "Detects faces and (optionally) matches them against a reference directory."
 
-    def __init__(self):
-        self.enabled = os.environ.get("SENT_EYE_ENABLE_FACES") == "1"
+    def __init__(self, enabled=None):
+        self.enabled = (
+            os.environ.get("SENT_EYE_ENABLE_FACES") == "1"
+            if enabled is None
+            else bool(enabled)
+        )
         self.reference_dir = os.environ.get("SENT_EYE_FACE_DB")
         try:
             self.tolerance = float(os.environ.get("SENT_EYE_FACE_TOLERANCE", "0.6"))

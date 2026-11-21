@@ -479,20 +479,66 @@ class HTMLReporter:
 
         parts = []
 
-        hibp = next((f for f in findings if f.get("check") == "hibp"), None)
-        if hibp:
-            if hibp.get("status") == "breached":
+        breach_check = next(
+            (f for f in findings
+             if f.get("check") in {"hibp", "xposedornot"}),
+            None,
+        )
+        if breach_check:
+            provider = _esc(breach_check.get("provider") or "XposedOrNot")
+            detail = _esc(breach_check.get("detail", ""))
+            status = breach_check.get("status")
+
+            if status == "breached":
+                breach_count = breach_check.get(
+                    "breach_count", len(breach_check.get("breaches") or [])
+                )
+                paste_count = breach_check.get("paste_count", 0)
+                risk = breach_check.get("risk") or {}
+                risk_label = risk.get("label") if isinstance(risk, dict) else None
+                risk_score = risk.get("score") if isinstance(risk, dict) else None
+
                 parts.append(
                     '<div class="card" style="border-left:4px solid #ef4444;">'
-                    f'<h3 style="margin:0 0 8px 0;color:#fca5a5;">'
-                    f'{_esc(hibp.get("detail", ""))}</h3>'
-                    '<p style="color:#94a3b8;margin:0;">Review the breach list below.</p>'
-                    '</div>'
+                    '<h3 style="margin:0 0 8px 0;color:#fca5a5;">'
+                    'Exposure records found</h3>'
+                    f'<p>{detail}</p>'
+                    f'<p><strong>Provider:</strong> {provider}</p>'
+                    f'<p><strong>Breach records:</strong> {_esc(breach_count)}</p>'
+                    f'<p><strong>Paste exposures:</strong> {_esc(paste_count)}</p>'
                 )
-            elif hibp.get("status") == "ok":
+                if risk_label is not None or risk_score is not None:
+                    parts.append(
+                        f'<p><strong>Risk:</strong> '
+                        f'{_esc(risk_label or "Not classified")}'
+                        f'{(" (" + _esc(risk_score) + ")") if risk_score is not None else ""}'
+                        '</p>'
+                    )
+                parts.append(
+                    '<p style="color:#94a3b8;margin-bottom:0;">'
+                    'Breach intelligence provided by XposedOrNot.</p></div>'
+                )
+
+            elif status == "ok":
                 parts.append(
                     '<div class="card" style="border-left:4px solid #22c55e;">'
-                    '<h3 style="margin:0;color:#86efac;">No known breaches</h3></div>'
+                    '<h3 style="margin:0 0 8px 0;color:#86efac;">'
+                    'No matching exposures returned</h3>'
+                    f'<p>{detail}</p>'
+                    f'<p><strong>Provider:</strong> {provider}</p>'
+                    '<p style="color:#94a3b8;margin-bottom:0;">'
+                    'Breach intelligence provided by XposedOrNot.</p>'
+                    '</div>'
+                )
+
+            elif status in {"warning", "error"}:
+                parts.append(
+                    '<div class="card" style="border-left:4px solid #eab308;">'
+                    '<h3 style="margin:0 0 8px 0;color:#fde047;">'
+                    'Breach lookup could not be completed</h3>'
+                    f'<p>{detail}</p>'
+                    f'<p><strong>Provider:</strong> {provider}</p>'
+                    '</div>'
                 )
 
         if "validation" in by_cat:
@@ -564,27 +610,139 @@ class HTMLReporter:
                     parts.append('</ul>')
                 parts.append('</div></div></div>')
 
-        if "breaches" in by_cat:
-            for f in by_cat["breaches"]:
-                if f.get("status") != "breached":
-                    continue
-                breaches = f.get("breaches") or []
-                parts.append('<h4 style="color:#fca5a5;margin:20px 0 8px 0;">Breach History</h4>')
-                parts.append('<table><tr><th>Breach</th><th>Date</th><th>Accounts</th><th>Data leaked</th></tr>')
-                for b in breaches:
-                    data_classes = ", ".join(b.get("data_classes", []))[:120]
-                    parts.append(
-                        f'<tr><td><strong>{_esc(b.get("title") or b.get("name", ""))}</strong></td>'
-                        f'<td>{_esc(b.get("date", ""))}</td>'
-                        f'<td>{_esc(b.get("pwn_count", ""))}</td>'
-                        f'<td style="font-size:0.85em;">{_esc(data_classes)}</td></tr>'
-                    )
-                parts.append('</table>')
+        if breach_check and breach_check.get("status") == "breached":
+            breaches = breach_check.get("breaches") or []
 
-        if hibp and hibp.get("status") == "skipped":
+            if breaches:
+                parts.append(
+                    '<h4 style="color:#fca5a5;margin:24px 0 12px 0;">'
+                    'Breach History</h4>'
+                )
+
+                for breach in breaches:
+                    name = breach.get("title") or breach.get("name") or "Unknown breach"
+                    date = breach.get("date") or "Unknown"
+                    dataset_count = breach.get("pwn_count")
+                    data_classes = breach.get("data_classes") or []
+                    description = breach.get("description") or ""
+                    password_risk = breach.get("password_risk") or "Unknown"
+                    verified = breach.get("verified") or "Unknown"
+                    industry = breach.get("industry") or ""
+                    domain = breach.get("domain") or ""
+                    reference_url = breach.get("reference_url") or ""
+                    logo = breach.get("logo") or ""
+
+                    if not isinstance(data_classes, list):
+                        data_classes = []
+
+                    parts.append(
+                        '<div class="card" style="margin-bottom:16px;'
+                        'border-left:4px solid #ef4444;">'
+                    )
+
+                    if logo:
+                        parts.append(
+                            '<div style="display:flex;gap:12px;'
+                            'align-items:center;margin-bottom:12px;">'
+                            f'<img src="{_esc(logo)}" alt="" '
+                            'style="width:42px;height:42px;object-fit:contain;'
+                            'border-radius:8px;">'
+                            f'<h3 style="margin:0;color:#fca5a5;">'
+                            f'{_esc(name)}</h3></div>'
+                        )
+                    else:
+                        parts.append(
+                            f'<h3 style="margin:0 0 12px 0;color:#fca5a5;">'
+                            f'{_esc(name)}</h3>'
+                        )
+
+                    parts.append(
+                        '<table class="meta-table">'
+                        f'<tr><td><strong>Breach date</strong></td>'
+                        f'<td>{_esc(date)}</td></tr>'
+                        f'<tr><td><strong>Dataset records</strong></td>'
+                        f'<td>{_esc(dataset_count if dataset_count is not None else "Unknown")}</td></tr>'
+                        f'<tr><td><strong>Password exposure</strong></td>'
+                        f'<td>{_esc(password_risk)}</td></tr>'
+                        f'<tr><td><strong>Verified</strong></td>'
+                        f'<td>{_esc(verified)}</td></tr>'
+                    )
+
+                    if industry:
+                        parts.append(
+                            f'<tr><td><strong>Industry</strong></td>'
+                            f'<td>{_esc(industry)}</td></tr>'
+                        )
+
+                    if domain:
+                        parts.append(
+                            f'<tr><td><strong>Domain</strong></td>'
+                            f'<td>{_esc(domain)}</td></tr>'
+                        )
+
+                    parts.append('</table>')
+
+                    if data_classes:
+                        parts.append(
+                            '<p><strong>Exposed information:</strong></p>'
+                            '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+                        )
+                        for item in data_classes:
+                            parts.append(
+                                '<span style="display:inline-block;'
+                                'padding:5px 10px;border-radius:20px;'
+                                'background:#7f1d1d;color:#fecaca;'
+                                'font-size:0.85em;">'
+                                f'{_esc(item)}</span>'
+                            )
+                        parts.append('</div>')
+
+                    if description:
+                        parts.append(
+                            '<p style="margin-top:14px;">'
+                            f'{_esc(description)}</p>'
+                        )
+
+                    if reference_url:
+                        parts.append(
+                            '<p><a href="' + _esc(reference_url) + '" '
+                            'target="_blank" rel="noopener noreferrer">'
+                            'View breach reference</a></p>'
+                        )
+
+                    parts.append('</div>')
+
+            password_strength = breach_check.get("password_strength") or {}
+
+            if isinstance(password_strength, dict) and password_strength:
+                labels = {
+                    "EasyToCrack": "Easy to crack",
+                    "PlainText": "Plaintext",
+                    "StrongHash": "Strong hash",
+                    "Unknown": "Unknown",
+                }
+
+                parts.append(
+                    '<h4 style="color:#38bdf8;margin:24px 0 12px 0;">'
+                    'Password Exposure Breakdown</h4>'
+                    '<div class="card"><table class="meta-table">'
+                    '<tr><th>Classification</th><th>Count</th></tr>'
+                )
+
+                for key, label in labels.items():
+                    count = password_strength.get(key, 0)
+                    if count:
+                        parts.append(
+                            f'<tr><td>{_esc(label)}</td>'
+                            f'<td>{_esc(count)}</td></tr>'
+                        )
+
+                parts.append('</table></div>')
+
+        if breach_check and breach_check.get("status") == "skipped":
             parts.append(
                 f'<p style="color:#94a3b8;margin-top:16px;">'
-                f'{_esc(hibp.get("detail", ""))}</p>'
+                f'{_esc(breach_check.get("detail", ""))}</p>'
             )
 
         return "\n".join(parts)

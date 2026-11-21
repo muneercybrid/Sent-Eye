@@ -10,3 +10,4 @@ face_recognition>=1.3.0
 # sent_eye.py. If you need `import face_recognition` to work outside
 # Sent Eye, uncomment the next line:
 # setuptools<82
+opencv-contrib-python-headless==5.1.0.95

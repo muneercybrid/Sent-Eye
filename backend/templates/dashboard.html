@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1118">
+  <meta name="description" content="Sent Eye OSINT investigation workspace">
+  <title>Sent Eye — Investigation Workspace</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/css/dashboard.css') }}">
+  <script src="{{ url_for('static', path='/js/dashboard.js') }}?v=20261120-auth1" defer></script>
+</head>
+<body>
+  <section class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
+    <div class="auth-shell">
+      <a class="auth-brand" href="/" aria-label="Sent Eye home">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span class="brand-copy">
+          <strong>sent<span>eye</span></strong>
+          <small>INTELLIGENCE WORKSPACE</small>
+        </span>
+      </a>
+
+      <div class="auth-card">
+        <div class="eyebrow">ACCOUNT ACCESS</div>
+        <h1 id="auth-title">Sign in to Sent Eye</h1>
+        <p class="auth-subtitle" id="auth-subtitle">
+          Sign in with an administrator-approved account to access your workspace.
+        </p>
+
+        <form id="login-form" novalidate>
+          <label class="auth-field" for="login-email">
+            Email address
+            <input id="login-email" type="email" autocomplete="username"
+                   maxlength="254" required placeholder="you@example.com">
+          </label>
+          <label class="auth-field" for="login-password">
+            Password
+            <input id="login-password" type="password"
+                   autocomplete="current-password" maxlength="256"
+                   required placeholder="Enter your password">
+          </label>
+          <button class="button button-primary auth-submit" id="login-submit"
+                  type="submit">Sign in</button>
+        </form>
+
+        <form id="register-form" class="hidden" novalidate>
+          <label class="auth-field" for="register-name">
+            Full name
+            <input id="register-name" type="text" autocomplete="name"
+                   maxlength="100" required placeholder="Your full name">
+          </label>
+          <label class="auth-field" for="register-email">
+            Email address
+            <input id="register-email" type="email" autocomplete="email"
+                   maxlength="254" required placeholder="you@example.com">
+          </label>
+          <label class="auth-field" for="register-password">
+            Password
+            <input id="register-password" type="password"
+                   autocomplete="new-password" minlength="12" maxlength="256"
+                   required placeholder="At least 12 characters">
+          </label>
+          <button class="button button-primary auth-submit" id="register-submit"
+                  type="submit">Request an account</button>
+        </form>
+
+        <div id="auth-message" class="auth-message hidden"
+             role="status" aria-live="polite"></div>
+
+        <div class="auth-switch">
+          <span id="auth-switch-text">New to Sent Eye?</span>
+          <button id="auth-mode-toggle" type="button">Request access</button>
+        </div>
+      </div>
+
+      <p class="auth-footnote">
+        New accounts require administrator approval before sign-in is enabled.
+      </p>
+    </div>
+  </section>
+
+  <div class="app-shell hidden">
+    <aside class="sidebar" aria-label="Main navigation">
+      <a class="brand" href="/" aria-label="Sent Eye home">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span class="brand-copy"><strong>sent<span>eye</span></strong><small>INTELLIGENCE WORKSPACE</small></span>
+      </a>
+
+      <div class="sidebar-label">WORKSPACE</div>
+      <nav class="nav-list">
+        <button class="nav-link active" type="button" data-view="overview">
+          <span class="nav-icon">⌂</span><span>Overview</span>
+        </button>
+        <button class="nav-link" type="button" data-view="investigate">
+          <span class="nav-icon">＋</span><span>New investigation</span>
+        </button>
+        <button class="nav-link" type="button" data-view="history">
+          <span class="nav-icon">◷</span><span>Investigation history</span>
+        </button>
+        <button class="nav-link" type="button" data-view="modules">
+          <span class="nav-icon">▦</span><span>Intelligence modules</span>
+        </button>
+        <button class="nav-link hidden" id="admin-nav" type="button" data-view="admin">
+          <span class="nav-icon">⚙</span><span>Administration</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="connection-card">
+          <div class="connection-heading"><span class="status-dot" id="sidebar-health-dot"></span><span>System status</span></div>
+          <strong id="sidebar-health-text">Connecting…</strong>
+          <small id="sidebar-health-subtext">Checking local API</small>
+        </div>
+        <div class="sidebar-foot"><span class="mini-orbit">◎</span> SENT EYE <span class="version" id="app-version">v0.2.0</span></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="mobile-brand"><span class="brand-mark"><span></span><span></span><span></span></span><strong>sent<span>eye</span></strong></div>
+        <div class="breadcrumbs"><span>Workspace</span><span class="crumb-divider">/</span><strong id="breadcrumb-current">Overview</strong></div>
+        <div class="topbar-actions">
+          <div class="api-indicator" id="api-indicator"><span class="status-dot"></span><span>Checking API</span></div>
+          <div class="account-meta">
+            <strong id="account-name">Sent Eye user</strong>
+            <small id="account-role">USER</small>
+          </div>
+          <button class="button button-secondary button-small" id="logout-button" type="button">Sign out</button>
+          <button class="avatar-button" id="avatar-button" type="button" aria-label="Signed-in user">SE</button>
+        </div>
+      </header>
+
+      <div class="content-wrap">
+        <section class="view-section active" id="view-overview" data-section="overview">
+          <div class="page-heading">
+            <div><div class="eyebrow">INTELLIGENCE OVERVIEW</div><h1>Investigation workspace</h1><p class="page-subtitle">A focused view of your OSINT activity and available intelligence capabilities.</p></div>
+            <button class="button button-primary" type="button" data-go="investigate"><span class="button-plus">＋</span> New investigation</button>
+          </div>
+
+          <div class="metrics-grid">
+            <article class="metric-card"><div class="metric-top"><span class="metric-label">INTELLIGENCE MODULES</span><span class="metric-icon violet">▦</span></div><div class="metric-value" id="metric-modules">—</div><div class="metric-caption">Registered in this workspace</div></article>
+            <article class="metric-card"><div class="metric-top"><span class="metric-label">AVAILABLE MODULES</span><span class="metric-icon green">✓</span></div><div class="metric-value" id="metric-available">—</div><div class="metric-caption">Runtime dependencies detected</div></article>
+            <article class="metric-card"><div class="metric-top"><span class="metric-label">ACTIVE JOBS</span><span class="metric-icon amber">◷</span></div><div class="metric-value" id="metric-active">—</div><div class="metric-caption">Pending or running investigations</div></article>
+            <article class="metric-card"><div class="metric-top"><span class="metric-label">COMPLETED JOBS</span><span class="metric-icon blue">⌁</span></div><div class="metric-value" id="metric-completed">—</div><div class="metric-caption">Available in the current session</div></article>
+          </div>
+
+          <div class="overview-grid">
+            <section class="panel welcome-panel">
+              <div class="welcome-copy"><div class="eyebrow light">SENT EYE / OSINT TOOLKIT</div><h2>Turn a target into<br>actionable intelligence.</h2><p>Run your existing intelligence modules against a permitted target. Track execution and inspect findings in one workspace.</p><button class="button button-light" type="button" data-go="investigate">Start an investigation <span>→</span></button></div>
+              <div class="welcome-art" aria-hidden="true"><div class="radar radar-one"></div><div class="radar radar-two"></div><div class="radar radar-three"></div><div class="radar-core">SE</div><i class="radar-point point-one"></i><i class="radar-point point-two"></i><i class="radar-point point-three"></i></div>
+            </section>
+
+            <section class="panel quick-panel">
+              <div class="panel-heading"><div><h3>Quick start</h3><p>Choose a target type to begin.</p></div><span class="heading-mark">↗</span></div>
+              <div class="quick-targets" id="quick-targets"><div class="empty-inline">Loading supported target types…</div></div>
+            </section>
+          </div>
+
+          <section class="panel recent-panel">
+            <div class="panel-heading"><div><h3>Recent investigations</h3><p>Your latest saved investigations.</p></div><button class="text-button" type="button" data-go="history">View history <span>→</span></button></div>
+            <div class="table-scroll"><table class="data-table"><thead><tr><th>TARGET</th><th>TYPE</th><th>STATUS</th><th>CREATED</th><th></th></tr></thead><tbody id="recent-jobs"><tr><td colspan="5" class="table-empty">No investigations yet. Start with a new investigation.</td></tr></tbody></table></div>
+          </section>
+        </section>
+
+        <section class="view-section" id="view-investigate" data-section="investigate">
+          <div class="page-heading"><div><div class="eyebrow">NEW WORKFLOW</div><h1>Start an investigation</h1><p class="page-subtitle">Select a target type and submit it to the available Sent Eye modules.</p></div></div>
+          <div class="investigation-layout">
+            <section class="panel form-panel">
+              <div class="panel-heading form-title"><div><h3>Investigation details</h3><p>Fields marked with an asterisk are required.</p></div><span class="step-number">01 <i>/ 02</i></span></div>
+              <form id="investigation-form" novalidate>
+                <div class="field-group"><label for="target-type">Target type <span class="required">*</span></label><select id="target-type" name="target_type" required><option value="">Loading supported types…</option></select><small class="field-help">Target types are populated from your registered intelligence modules.</small></div>
+                <div class="field-group" id="target-text-group"><label for="target-value">Target value <span class="required">*</span></label><input id="target-value" name="target" type="text" maxlength="512" autocomplete="off" placeholder="Enter a username, email, phone number, IP address…"><small class="field-help" id="target-help">Enter the identifier you are authorized to investigate.</small></div>
+                <div class="field-group hidden" id="target-file-group"><label for="target-file">Image file <span class="required">*</span></label><label class="upload-zone" for="target-file" id="upload-zone"><span class="upload-symbol">↑</span><strong>Choose an image to upload</strong><span>JPG, PNG, WEBP and other supported image formats</span><small id="file-name">Maximum request size: 20 MB</small><input id="target-file" name="file" type="file" accept="image/*"></label></div>
+                <div class="field-group hidden" id="face-option-group"><label class="toggle-row" for="analyze-faces"><span><strong>Enable facial analysis</strong><small>Optional. Requires the face-analysis dependencies and explicit consent.</small></span><input id="analyze-faces" type="checkbox"><span class="toggle-ui"></span></label><div class="notice notice-warning">Facial analysis is disabled by default. Only enable it when you have the necessary consent and legal authority.</div></div>
+                <div class="field-group"><label for="engines">Reverse-search engines <span class="optional">OPTIONAL</span></label><input id="engines" name="engines" type="text" placeholder="e.g. google,bing,tineye"><small class="field-help">Optional engine preference passed to the existing investigation backend. Leave empty to use its defaults.</small></div>
+                <div class="consent-box"><label class="checkbox-row" for="acknowledge-consent"><input id="acknowledge-consent" type="checkbox" required><span class="checkbox-custom"></span><span>I confirm that I have permission and a lawful basis to investigate this target.</span></label></div>
+                <div class="form-error hidden" id="form-error" role="alert"></div>
+                <div class="form-actions"><button class="button button-primary button-submit" id="submit-investigation" type="submit"><span>Run investigation</span><span>→</span></button><span class="form-footnote">Jobs run using your existing registered modules.</span></div>
+              </form>
+            </section>
+
+            <aside class="side-column">
+              <section class="panel side-info-panel"><div class="side-icon">⌘</div><h3>How investigations work</h3><ol class="workflow-list"><li><span>1</span><div><strong>Submit a target</strong><small>Choose an identifier or upload an image.</small></div></li><li><span>2</span><div><strong>Modules run</strong><small>Compatible registered modules process the target.</small></div></li><li><span>3</span><div><strong>Review findings</strong><small>Inspect results and export available reports.</small></div></li></ol></section>
+              <section class="panel side-info-panel privacy-panel"><div class="privacy-head"><span>◇</span><strong>Responsible use</strong></div><p>Only investigate targets when you have authorization and a legitimate purpose. Uploaded files are handled by the application’s existing temporary-workspace process.</p></section>
+              <section class="panel side-info-panel"><div class="panel-heading compact"><div><h3>Compatible modules</h3><p>For the selected target</p></div></div><div id="compatible-modules" class="compatible-list"><span class="empty-inline">Select a target type to see compatible modules.</span></div></section>
+            </aside>
+          </div>
+          <section class="panel active-job-panel hidden" id="active-job-panel"><div class="panel-heading"><div><div class="eyebrow">LIVE EXECUTION</div><h3>Investigation progress</h3><p id="active-job-target">Preparing your investigation…</p></div><span class="status-pill status-pending" id="active-job-status">PENDING</span></div><div class="progress-track"><div class="progress-fill" id="active-job-progress"></div></div><div class="progress-meta"><span id="active-job-step">Waiting for a worker…</span><strong id="active-job-percent">0%</strong></div><div class="job-result-actions hidden" id="active-job-actions"><button class="button button-primary button-small" type="button" id="view-active-report">View report</button><button class="button button-secondary button-small" type="button" id="download-active-json">Download JSON</button><button class="button button-secondary button-small" type="button" id="open-active-html">Open HTML report</button></div></section>
+        </section>
+
+        <section class="view-section" id="view-history" data-section="history">
+          <div class="page-heading"><div><div class="eyebrow">ACTIVITY LOG</div><h1>Investigation history</h1><p class="page-subtitle">Review your saved investigations and reopen archived reports.</p></div><button class="button button-secondary" type="button" id="refresh-history">↻ Refresh</button></div>
+          <section class="panel history-panel"><div class="panel-heading"><div><h3>All investigations</h3><p>Completed reports are archived and remain available after server restarts.</p></div><span class="count-chip" id="history-count">0 jobs</span></div><div class="table-scroll"><table class="data-table history-table"><thead><tr><th>TARGET</th><th>TYPE</th><th>STATUS</th><th>PROGRESS</th><th>CREATED</th><th>ACTIONS</th></tr></thead><tbody id="history-jobs"><tr><td colspan="6" class="table-empty">No investigation jobs found.</td></tr></tbody></table></div></section>
+          <p class="subtle-note">Investigation history is stored in your Sent Eye database. Completed report data is archived separately from live job execution.</p>
+        </section>
+
+        <section class="view-section" id="view-modules" data-section="modules">
+          <div class="page-heading"><div><div class="eyebrow">CAPABILITY REGISTRY</div><h1>Intelligence modules</h1><p class="page-subtitle">Live module registry reported by the Sent Eye backend.</p></div><button class="button button-secondary" type="button" id="refresh-modules">↻ Refresh</button></div>
+          <div class="module-summary" id="module-summary"></div>
+          <div class="module-grid" id="module-grid"><div class="panel module-loading">Loading registered modules…</div></div>
+        </section>
+          <section class="view-section" id="view-admin" data-section="admin">
+            <div class="page-heading">
+              <div>
+                <div class="eyebrow">CONTROL CENTRE</div>
+                <h1>Administration</h1>
+                <p class="page-subtitle">Manage accounts, access policies, investigations and platform security.</p>
+              </div>
+              <button class="button button-secondary" type="button" id="admin-refresh">↻ Refresh data</button>
+            </div>
+
+            <div class="admin-metrics-grid" id="admin-metrics">
+              <article class="metric-card"><div class="metric-label">REGISTERED USERS</div><div class="metric-value">—</div></article>
+              <article class="metric-card"><div class="metric-label">PENDING APPROVALS</div><div class="metric-value">—</div></article>
+              <article class="metric-card"><div class="metric-label">INVESTIGATIONS</div><div class="metric-value">—</div></article>
+              <article class="metric-card"><div class="metric-label">ACTIVE SESSIONS</div><div class="metric-value">—</div></article>
+            </div>
+
+            <div class="panel admin-security-strip" id="admin-security-summary">
+              Security and operational statistics will appear here.
+            </div>
+
+            <div class="admin-tabs" role="tablist" aria-label="Administration sections">
+              <button class="admin-tab-button active" type="button" data-admin-tab="users" role="tab" aria-selected="true">Users and accounts</button>
+              <button class="admin-tab-button" type="button" data-admin-tab="permissions" role="tab" aria-selected="false">Module permissions</button>
+              <button class="admin-tab-button" type="button" data-admin-tab="investigations" role="tab" aria-selected="false">Investigations</button>
+              <button class="admin-tab-button" type="button" data-admin-tab="audit" role="tab" aria-selected="false">Audit and security</button>
+            </div>
+
+            <section class="admin-tab-panel active" id="admin-panel-users">
+              <div class="panel admin-panel">
+                <div class="panel-heading admin-panel-heading">
+                  <div><h3>Account management</h3><p>Approve registrations, manage account status and control administrator roles.</p></div>
+                  <span class="count-chip" id="admin-user-count">0 accounts</span>
+                </div>
+                <div class="admin-toolbar">
+                  <input id="admin-user-search" type="search" placeholder="Search name or email…" aria-label="Search users">
+                  <select id="admin-user-status-filter" aria-label="Filter users by status">
+                    <option value="">All account statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+                <div class="table-scroll">
+                  <table class="data-table admin-table">
+                    <thead><tr><th>ACCOUNT</th><th>ROLE</th><th>STATUS</th><th>LAST LOGIN</th><th>CREATED</th><th>CONTROLS</th></tr></thead>
+                    <tbody id="admin-users-table"><tr><td colspan="6" class="table-empty">Loading accounts…</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-tab-panel" id="admin-panel-permissions">
+              <div class="panel admin-panel">
+                <div class="panel-heading admin-panel-heading">
+                  <div><h3>Module access and quotas</h3><p>Select an account to configure its individual intelligence-module permissions.</p></div>
+                </div>
+                <div class="admin-toolbar">
+                  <select id="admin-permission-user" aria-label="Select account for permission management">
+                    <option value="">Select a user account</option>
+                  </select>
+                </div>
+              </div>
+              <div class="panel admin-permission-panel hidden" id="admin-permission-editor">
+                <div class="panel-heading">
+                  <div><h3 id="admin-permission-title">Module permissions</h3><p id="admin-permission-description">Configure module access and execution quotas.</p></div>
+                </div>
+                <div class="admin-permission-grid" id="admin-permission-grid"></div>
+                <div class="form-actions admin-save-actions">
+                  <button class="button button-primary" type="button" id="admin-save-permissions">Save module permissions</button>
+                  <span class="form-footnote">Blank quota means unlimited executions.</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-tab-panel" id="admin-panel-investigations">
+              <div class="panel admin-panel">
+                <div class="panel-heading admin-panel-heading">
+                  <div><h3>Platform investigations</h3><p>Review investigations across all accounts and open archived reports.</p></div>
+                  <span class="count-chip" id="admin-investigation-count">0 investigations</span>
+                </div>
+                <div class="table-scroll">
+                  <table class="data-table admin-table">
+                    <thead><tr><th>TARGET</th><th>ACCOUNT</th><th>TYPE</th><th>STATUS</th><th>CREATED</th><th>REPORT</th></tr></thead>
+                    <tbody id="admin-investigations-table"><tr><td colspan="6" class="table-empty">Loading investigations…</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+
+            <section class="admin-tab-panel" id="admin-panel-audit">
+              <div class="panel admin-panel">
+                <div class="panel-heading admin-panel-heading">
+                  <div><h3>Audit and security activity</h3><p>Administrative actions, account events, module access and login outcomes.</p></div>
+                  <span class="count-chip" id="admin-audit-count">0 events</span>
+                </div>
+                <div class="table-scroll">
+                  <table class="data-table admin-table">
+                    <thead><tr><th>TIME</th><th>EVENT</th><th>ACTOR</th><th>SUBJECT</th><th>DETAILS</th></tr></thead>
+                    <tbody id="admin-audit-table"><tr><td colspan="5" class="table-empty">Loading audit events…</td></tr></tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+            <p class="subtle-note">Administrator actions are permission-checked by the server and recorded in the audit log. Sensitive account credentials and session tokens are never displayed here.</p>
+          </section>
+      </div>
+
+      <footer class="main-footer"><span>Sent Eye <span class="footer-dot">•</span> OSINT investigation workspace</span><span>Use responsibly. Verify findings independently.</span></footer>
+    </main>
+  </div>
+
+  <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <div class="modal-backdrop hidden" id="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-title">
+    <div class="report-dialog"><div class="report-header"><div><div class="eyebrow">INVESTIGATION OUTPUT</div><h2 id="report-title">Investigation report</h2><p id="report-subtitle">Review the findings returned by Sent Eye.</p></div><button class="icon-button" type="button" id="close-report" aria-label="Close report">×</button></div><div class="report-toolbar"><span class="status-pill status-completed" id="report-status">COMPLETED</span><div class="report-actions"><button class="button button-secondary button-small" type="button" id="report-download-json">↓ JSON</button><button class="button button-secondary button-small" type="button" id="report-open-html">↗ HTML report</button></div></div><div class="report-content" id="report-content"><div class="empty-inline">Loading report…</div></div></div>
+  </div>
+</body>
+</html>
